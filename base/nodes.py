@@ -1,0 +1,112 @@
+# encoding: utf-8
+# Author    : WuY<wuyong@mails.ccnu.edu.com>
+# Datetime  : 2023/10/21
+# User      : WuY
+# File      : nodes.py
+# 将各种用于神经网络的`节点`集合到这里
+
+import os
+import sys
+sys.path.append(os.path.dirname(__file__))  # 将文件所在地址放入系统调用地址中
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import numpy as np
+import matplotlib.pyplot as plt
+from surrogate import *
+
+class BaseNode(nn.Module):
+    """
+    神经元模型的基类
+    Args:
+        :param threshold: 神经元发放脉冲需要达到的阈值
+        :param v_reset: 静息电位
+        :param mem_detach: 是否将上一时刻的膜电位在计算图中截断
+    """
+    def __init__(self,
+                 threshold=.5,
+                 v_reset=0.,
+                 mem_detach=False,
+                 decay=0.2,
+                 ):
+        super().__init__()
+        self.mem = None
+        self.spike = None
+        self.threshold=threshold
+        self.v_reset=v_reset
+        self.decay = decay     # decay constants
+        self.mem_detach = mem_detach
+
+    def forward(self, x):
+        if self.mem_detach and hasattr(self.mem, 'detach'):
+            self.mem = self.mem.detach()
+            self.spike = self.spike.detach()
+        self.integral(x)
+        self.calc_spike()
+        return self.spike
+        
+    def integral(self, inputs):
+        """
+        计算由当前inputs对于膜电势的累积
+        :param inputs: 当前突触输入电流
+        :type inputs: torch.tensor
+        :return: None
+        """
+        pass
+
+    def calc_spike(self):
+        """
+        通过当前的mem计算是否发放脉冲，并reset
+        :return: None
+        """
+        pass
+    
+    def n_reset(self):
+        """
+        神经元重置，用于模型接受两个不相关输入之间，重置神经元所有的状态
+        :return: None
+        """
+        self.mem = None
+        self.spike = None
+
+        
+# ============================================================================
+# 用于SNN的node
+
+class LIFNode(BaseNode):
+    def __init__(self, threshold=.5, decay=0.2, act_fun=SpikeAct):
+        super().__init__(threshold=threshold, decay=decay)
+        self.act_fun = act_fun(alpha=0.5, requires_grad=False)
+
+    def integral(self, inputs):
+        """
+        计算由当前inputs对于膜电势的累积
+        :param inputs: 当前突触输入电流
+        :type inputs: torch.tensor
+        :return: None
+        """
+        if self.mem is None:
+            self.mem = torch.zeros_like(inputs, device=inputs.device)
+            self.spike = torch.zeros_like(inputs, device=inputs.device)
+        self.mem = self.decay * self.mem
+        self.mem += inputs
+
+    def calc_spike(self):
+        """
+        通过当前的mem计算是否发放脉冲，并reset
+        :return: None
+        """
+        self.spike = self.act_fun(self.mem-self.threshold)
+        self.mem = self.mem * (1 - self.spike.detach())
+
+
+class LIFbackEI(BaseNode):
+    """
+    BackEINode with self feedback connection and excitatory and inhibitory neurons
+    Reference：https://www.sciencedirect.com/science/article/pii/S0893608022002520
+    Args:
+        :param in_channel: 反馈调节和EI输出，在该层中卷积核的数量
+
+    """
+    def __init__(self, in_channel, threshold=.5, decay=0.2, if_ei=False, if_back=False, cfg_backei=2, mem_detach=False):
+        super().__init__(threshold=threshold, decay=decay)

@@ -105,8 +105,46 @@ class LIFbackEI(BaseNode):
     BackEINode with self feedback connection and excitatory and inhibitory neurons
     Reference：https://www.sciencedirect.com/science/article/pii/S0893608022002520
     Args:
-        :param in_channel: 反馈调节和EI输出，在该层中卷积核的数量
-
+        :params
+        in_channel: 反馈调节和EI输出，在该层中卷积核的数量
+        threshold: LIF的重置阈值
+        decay: LIF的衰减因子
+        if_ei: EI输出开关
+        if_back: 反馈调节开关
+        cfg_backei: EI和反馈调节的卷积核大小(2*cfg_backei+1), 与周围神经元关联范围
+        act_fun: LIF的激活函数
+        th_fun: EI的符号函数
     """
-    def __init__(self, in_channel, threshold=.5, decay=0.2, if_ei=False, if_back=False, cfg_backei=2, mem_detach=False):
+    def __init__(self, in_channel=None, threshold=.5, decay=0.2, 
+                 if_ei=False, if_back=False, cfg_backei=2,
+                act_fun=SpikeAct, th_fun=EIAct):
         super().__init__(threshold=threshold, decay=decay)
+        self.act_fun = act_fun(alpha=0.5)   # LIF的激活函数
+        self.th_fun = th_fun()              # ei的符号函数
+        self.if_ei = if_ei
+        self.if_back = if_back
+        if self.if_ei:
+            self.ei = nn.Conv2d(in_channel, in_channel, kernel_size=2*cfg_backei+1, stride=1, padding=cfg_backei)
+        if self.if_back:
+            self.back = nn.Conv2d(in_channel, in_channel, kernel_size=2*cfg_backei+1, stride=1, padding=cfg_backei)
+
+    def integral(self, inputs):
+        if self.mem is None:
+            self.mem = torch.zeros_like(inputs, device=inputs.device)
+            self.spike = torch.zeros_like(inputs, device=inputs.device)
+        self.mem = self.decay * self.mem
+        if self.if_back:
+            self.mem += F.sigmoid(self.back(self.spike)) * inputs
+        else:
+            self.mem += inputs
+    
+    def calc_spike(self):
+        if self.if_ei:
+            ei_gate = self.th_fun(self.ei(self.mem))
+            self.spike = self.act_fun(self.mem-self.threshold)
+            self.mem = self.mem * (1 - self.spike)
+            self.spike = ei_gate * self.spike
+        else:
+            self.spike = self.act_fun(self.mem-self.threshold)
+            self.mem = self.mem * (1 - self.spike)
+

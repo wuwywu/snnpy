@@ -69,12 +69,12 @@ class FRLayer(nn.Module):
                 self.out = torch.zeros_like(x)
                 self.out += x/self.time_window
                 self.count += 1
-            elif self.count >= self.time_window:
-                self.count = 0
-                self.out = None
             else:
                 self.out += x/self.time_window
                 self.count += 1
+            if self.count>=self.time_window :
+                self.count = 0
+
         if not self.if_grad:
             self.out = self.out.clone().detch().cpu()
 

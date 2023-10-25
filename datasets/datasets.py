@@ -140,7 +140,7 @@ def fashion_MNIST(train=True, batch_size=100, num_workers=8, if_transforms=True,
             else: transform_test = None
         else:   transform_test = transforms_IN
 
-        test_dataset = torchvision.datasets.MNIST(root= data_path, train=False, download=True, transform=transform_test)
+        test_dataset = torchvision.datasets.FashionMNIST(root=data_path, train=False, download=True, transform=transform_test)
         test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=True)
         return test_loader
 

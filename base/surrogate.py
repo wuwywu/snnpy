@@ -94,3 +94,25 @@ class EIAct(SurrogateFunctionBase):
     def act_fun(x, alpha):
         return ei_act.apply(x)
     
+
+class spike_act_stdp(torch.autograd.Function):
+    # 定义应用STDP的LIF中的激活函数
+    @staticmethod
+    def forward(ctx, inputs):
+        outputs = input.gt(0).float()
+        ctx.save_for_backward(outputs)
+        return outputs
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        inputs, = ctx.saved_tensors
+        return inputs * grad_output
+
+class SpikeActSTDP(SurrogateFunctionBase):
+    def __init__(self, alpha=0.5, requires_grad=False):
+        super().__init__(alpha, requires_grad)
+
+    @staticmethod
+    def act_fun(x, alpha):
+        return spike_act_stdp.apply(x)
+

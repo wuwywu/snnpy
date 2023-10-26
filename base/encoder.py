@@ -2,7 +2,7 @@
 # Author    : WuY<wuyong@mails.ccnu.edu.com>
 # Datetime  : 2023/10/21
 # User      : WuY
-# File      : layers.py
+# File      : encoder.py
 # 将各种用于神经网络的`编码方式`集合到这里
 
 import os

@@ -81,8 +81,77 @@ class FRLayer(nn.Module):
         return self.out
 
 
+class VotingLayer(nn.Module):
+    """
+    投票层可用于最后没有标签（无监督学习），判断最终的正确率。
+    用于SNNs的输出层, 几个神经元投票选出最终的类
+    根据每个神经元在训练集的一次呈现中对十类数字的最高响应为每个神经元分配一个类别。
+    这是无监督学习使用投票层时，唯一使用标签的步骤
+    reference : Diehl, P. U., & Cook, M. (2015). Unsupervised learning of digit recognition using spike-timing-dependent plasticity. Frontiers in Computational Neuroscience, 9, 99.
+    """
+    def __init__(self, label_shape: int=10, alpha=0.1):
+        super().__init__()
+        self.n_labels = label_shape  # 标签类别数(如MNIST : 10)
+        self.assignments = None
+        self.alpha = alpha          # 放电率移动平均旧数据的衰减因子
+        self.rates = None           # 通过这个放电率判断每个神经元的vote[n_neurons, n_label]
 
+    def forward(self, spikes: torch.Tensor):
+        """
+        先使用 assign_votes 得到最后一层神经元各自的票（类别）
+        get_label : 根据最后一层的spike 计算得到label
+        根据最后一层的spike 计算得到测试的label
+        """
+        Nbatch = spikes.size(0)
+        spikes = spikes.cpu().sum(2).to(spikes.device)
+        rates = torch.zeros(Nbatch, self.n_labels, device=spikes.device)
+        for i in range(self.n_labels):
+            n_assigns = torch.sum(self.assignments == i).float()  # 共有多少个该类别节点
+            if n_assigns > 0:
+                indices = torch.nonzero(self.assignments == i).view(-1)  # 找到该类别节点位置
+                rates[:, i] = torch.sum(spikes[:, indices], 1) / n_assigns  # 该类别平均所有该类别节点发放脉冲数
+
+        return torch.sort(rates, dim=1, descending=True)[1][:, 0]
+
+    def assign_votes(self, spikes, labels):
+        """
+        根据数据的标签，给投票的神经元(voters)分配标签
+        spikes --> [N, in_size, T] 将时间为放在最后一维
+        labels --> [N] 批次的标签(如MNIST有数据0-9)
+        """
+        # print(spikes.size())
+        n_neurons = spikes.size(1)  # 获取最后一层的神经元数量(voters)
+        if self.rates is None:
+            self.rates = torch.zeros(n_neurons, self.n_label, device=spikes.device)
+        spikes = spikes.cpu().sum(2).to(spikes.device)
+        for i in range(self.n_labels):
+            n_labeled = torch.sum(labels == i).float()
+            if n_labeled > 0:
+                indices = torch.nonzero(labels == i).view(-1)
+                tmp = torch.sum(spikes[indices], 0) / n_labeled  # 平均脉冲数
+                self.rates[:, i] = self.alpha*self.rates[:, i]+(1-self.alpha)*tmp
+
+        self.assignments = torch.max(self.rates, 1)[1]      # assignments表示voters的支持标签
     
 
+class WTALayer(nn.Module):
+    """
+    winner take all用于SNNs的每层后，将随机选取一个或者多个输出(在通道维度上处理)
+    :param k: X选取的输出数目 k默认等于1
+    """
+    def __init__(self, k=1):
+        super().__init__()
+        self.k = k
+
+    def forward(self, x: torch.Tensor):
+        # x.shape = [N,C,W,H]
+        # ret.shape = [N,C,W,H]
+        pos = x * torch.rand(x.shape, device=x.device)
+        if self.k > 1:
+            x = x * (pos >= pos.topk(self.k, dim=1)[0][:, -1:]).float()
+        else:
+            x = x * (pos >= pos.max(1, True)[0]).float()
+
+        return x
 
     

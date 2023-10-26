@@ -148,3 +148,9 @@ class LIFbackEI(BaseNode):
             self.spike = self.act_fun(self.mem-self.threshold)
             self.mem = self.mem * (1 - self.spike)
 
+
+class LIFSTDP(BaseNode):
+    """
+    用于执行STDP运算时使用的节点 decay的方式是膜电位乘以decay并直接加上输入电流
+    reference : https://doi.org/10.1016/j.neunet.2023.06.019
+    """

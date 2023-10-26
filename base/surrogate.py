@@ -98,7 +98,7 @@ class EIAct(SurrogateFunctionBase):
 class spike_act_stdp(torch.autograd.Function):
     # 定义应用STDP的LIF中的激活函数
     @staticmethod
-    def forward(ctx, inputs):
+    def forward(ctx, input):
         outputs = input.gt(0).float()
         ctx.save_for_backward(outputs)
         return outputs

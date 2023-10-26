@@ -19,12 +19,16 @@ class BaseNode(nn.Module):
     """
     神经元模型的基类
     Args:
-        :param threshold: 神经元发放脉冲需要达到的阈值
-        :param v_reset: 静息电位
-        :param mem_detach: 是否将上一时刻的膜电位在计算图中截断
+        :params
+        threshold: 神经元发放脉冲需要达到的阈值(神经元的参数)
+        requires_thres_grad: 阈值求梯度
+        v_reset: 静息电位
+        decay: 膜电位衰减项
+        mem_detach: 是否将上一时刻的膜电位在计算图中截断
     """
     def __init__(self,
                  threshold=.5,
+                 requires_thres_grad=False,
                  v_reset=0.,
                  mem_detach=False,
                  decay=0.2,
@@ -32,8 +36,8 @@ class BaseNode(nn.Module):
         super().__init__()
         self.mem = None
         self.spike = None
-        self.threshold=threshold
-        self.v_reset=v_reset
+        self.threshold = nn.Parameter(torch.tensor(threshold), requires_grad=requires_thres_grad)
+        self.v_reset = v_reset
         self.decay = decay     # decay constants
         self.mem_detach = mem_detach
 
@@ -146,11 +150,37 @@ class LIFbackEI(BaseNode):
             self.spike = ei_gate * self.spike
         else:
             self.spike = self.act_fun(self.mem-self.threshold)
-            self.mem = self.mem * (1 - self.spike)
+            self.mem = self.mem * (1 - self.spike.detach())
 
 
 class LIFSTDP(BaseNode):
     """
     用于执行STDP运算时使用的节点 decay的方式是膜电位乘以decay并直接加上输入电流
     reference : https://doi.org/10.1016/j.neunet.2023.06.019
+    args:
+        :params
+        threshold: 神经元发放脉冲需要达到的阈值(神经元的参数)
+        decay: LIF的衰减因子
+        act_fun: LIF的激活函数
     """
+    def __init__(self, threshold=.5, decay=0.2, act_fun=SpikeActSTDP):
+        super().__init__(threshold=threshold, decay=decay)
+        self.act_fun = act_fun(alpha=.5, requires_grad=False)   # 激活函数
+
+    def integral(self, inputs):
+        if self.mem is None:
+            self.mem = torch.zeros_like(inputs, device=inputs.device)
+            self.spike = torch.zeros_like(inputs, device=inputs.device)
+        self.mem = self.decay * self.mem + inputs
+
+    def calc_spike(self):
+        self.spike = self.act_fun(self.mem - self.threshold)  # SpikeActSTDP : approximation firing function, LIF的阈值 threshold
+        self.mem = self.mem * (1 - self.spike.detach())
+
+
+if __name__ == "__main__":
+    snn = LIFSTDP()
+    # snn = LIFbackEI()
+    print(snn(torch.tensor([10, 0.1])))
+    print(snn.mem)
+    print(snn.spike)

@@ -68,11 +68,12 @@ class STDPConv(nn.Module):
         decay_trace: STDP计算trace时的衰减因子
         offset: 计算梯度时与trace相减的偏置
         inh: 侧抑制的抑制率(mode="threshold", 自适应性阈值)
+        time_window: 时间窗口
     """
     def __init__(self, in_planes, out_planes,
                  kernel_size, stride, padding, groups,
                  decay=0.2, decay_trace=0.99, offset=0.3,
-                 inh=1.625):
+                 inh=1.625, time_window=10):
         super().__init__()
         self.conv = nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size,
                               stride=stride, padding=padding, groups=groups, bias=False)
@@ -85,8 +86,55 @@ class STDPConv(nn.Module):
         self.decay_trace = decay_trace
         self.offset = offset
 
-    def forward(self):
-        pass
+        self.time_window = time_window
+        self.dw = 0 # STDP的改变的权重变化量（/batch*T）
+
+    def forward(self, x):
+        """
+        args:
+            x: 输入脉冲(B, C, H, W)
+        return:
+            :spikes: 是脉冲 (B,C,H,W)
+        """
+        spikes, dw = self.STDP(x)
+        self.dw += dw/self.time_window
+
+        return spikes
+
+    def STDP(self, x):
+        """
+        利用STDP获得权重的变化量
+        所有的结构都会在这个过程中利用
+        args:
+            :x : [B,C,H,W] -- 突触前峰(若包含时间就将其降维到B中)
+        return:
+            :s是脉冲 (B,C,H,W)
+            :dw更新量 (out_planes,in_planes,H,W)
+        """
+        x = x.clone().detach()  # 突触前的峰
+        i = self.conv(x)  # 输入电流(经过卷积后)
+        with torch.no_grad():
+            thre_max = self.getthresh(i.detach())  # 自适应性阈值
+            i_ASF = self.ASFilter(i, thre_max)  # 通过适应阈值对电流进行滤波
+            s = self.mem_update(i_ASF)  # 输出脉冲
+            trace = self.cal_trace(x)  # 通过突触前峰更新trace
+            x.data += trace - x.data - self.offset  # x变为trace(求导得出的值)
+        dw = torch.autograd.grad(outputs=i, inputs=self.conv.weight, grad_outputs=s)[0]
+        # print(x.size(0))
+        dw /= x.size(0)  # 批次维度在求导时相加，除去
+        return s, dw
+
+    def cal_trace(self, x):
+        """
+        计算trace
+        x : [B,C,W,H] -- 突触前峰
+        """
+        if self.trace is None:
+            self.trace = nn.Parameter(x.clone().detach(), requires_grad=False)
+        else:
+            self.trace *= self.decay_trace
+            self.trace += x
+        return self.trace.detach()
 
     def mem_update(self, x):
         """
@@ -128,38 +176,17 @@ class STDPConv(nn.Module):
         current_ASF = thre / (1 + torch.exp(-(current - 4 * thre / 10) * (8 / thre)))
         return current_ASF
 
-    def STDP(self, x):
+    def normgrad(self):
         """
-        利用STDP获得权重的变化量
-        所有的结构都会在这个过程中利用
-        args:
-            :x : [B,C,W,H] -- 突触前峰(若包含时间就将其降维到B中)
-        return : s是脉冲 dw更新量
+        将STDP带来的权重变化量放入权重梯度中，然后使用优化器更新权重
         """
-        x = x.clone().detach()  # 突触前的峰
-        i = self.conv(x)        # 输入电流(经过卷积后)
-        with torch.no_grad():
-            thre_max = self.getthresh(i.detach())  # 自适应性阈值
-            i_ASF = self.ASFilter(i, thre_max)         # 通过适应阈值对电流进行滤波
-            s = self.mem_update(i_ASF)  # 输出脉冲
-            trace = self.cal_trace(x)  # 通过突触前峰更新trace
-            x.data += trace - x.data - self.offset  # x变为trace(求导得出的值)
-        dw = torch.autograd.grad(outputs=i, inputs=self.conv.weight, grad_outputs=s)[0]
-        # print(x.size(0))
-        dw /= x.size(0)  # 批次维度在求导时相加，除去
-        return s, dw
+        self.conv.weight.grad.data = -self.dw
 
-    def cal_trace(self, x):
+    def normweight(self):
         """
-        计算trace
-        x : [B,C,W,H] -- 突触前峰
+        权重在更新后标准化，防止它们发散或移动
         """
-        if self.trace is None:
-            self.trace = nn.Parameter(x.clone().detach(), requires_grad=False)
-        else:
-            self.trace *= self.decay_trace
-            self.trace += x
-        return self.trace.detach()
+        pass
 
     def reset(self):
         """
@@ -167,11 +194,17 @@ class STDPConv(nn.Module):
         """
         self.lif.n_reset()
         self.trace = None
+        self.dw = 0    # 将权重变化量清0
 
 
 class MNISTnet(nn.Module):
     def __init__(self):
         super().__init__()
+        self.net = nn.ModuleList([
+            STDPConv(in_planes=1, out_planes=12, kernel_size=3,
+                     stride=1, padding=1, groups=1, decay=0.2,
+                     decay_trace=0.99, offset=0.3, inh=1.625)
+        ])
 
 
 
@@ -179,4 +212,4 @@ if __name__ == "__main__":
     snn = STDPConv(in_planes=1, out_planes=12,
                  kernel_size=3, stride=1, padding=1, groups=1)
     # snn.STDP(torch.ones((3, 1, 3, 3)))
-    print(snn.STDP(torch.ones((3,1,3,3))))
+    # print(snn.STDP(torch.ones((3,1,3,3))))

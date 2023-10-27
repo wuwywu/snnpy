@@ -162,9 +162,10 @@ class LIFSTDP(BaseNode):
         threshold: 神经元发放脉冲需要达到的阈值(神经元的参数)
         decay: LIF的衰减因子
         act_fun: LIF的激活函数
+        mem_detach: 是否将上一时刻的膜电位在计算图中截断
     """
-    def __init__(self, threshold=.5, decay=0.2, act_fun=SpikeActSTDP):
-        super().__init__(threshold=threshold, decay=decay)
+    def __init__(self, threshold=.5, decay=0.2, mem_detach=True, act_fun=SpikeActSTDP):
+        super().__init__(threshold=threshold, decay=decay, mem_detach=mem_detach)
         self.act_fun = act_fun(alpha=.5, requires_grad=False)   # 激活函数
 
     def integral(self, inputs):

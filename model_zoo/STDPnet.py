@@ -182,11 +182,24 @@ class STDPConv(nn.Module):
         """
         self.conv.weight.grad.data = -self.dw
 
-    def normweight(self):
+    def normweight(self, clip=False):
         """
         权重在更新后标准化，防止它们发散或移动
+        self.conv.weight --> (N,C,H,W)
+        args:
+            clip: 是否裁剪权重
         """
-        pass
+        if clip:
+            self.conv.weight.data = torch. \
+                clamp(self.conv.weight.data, min=-3, max=1.0)
+        else:
+            N, C, H, W = self.conv.weight.data.shape
+
+            avg = self.conv.weight.data.mean(1, True).mean(2, True).mean(3, True)   # 每个批次的均值不一样
+            self.conv.weight.data -= avg
+            # 将除了批次维度的其他所有维度全部集中在第2维上，然后可以求出批次上的标准差
+            tmp = self.conv.weight.data.reshape(N, 1, -1, 1)
+            self.conv.weight.data /= tmp.std(2, unbiased=False, keepdim=True)   # 不使用无偏标准差
 
     def reset(self):
         """
@@ -205,7 +218,6 @@ class MNISTnet(nn.Module):
                      stride=1, padding=1, groups=1, decay=0.2,
                      decay_trace=0.99, offset=0.3, inh=1.625)
         ])
-
 
 
 if __name__ == "__main__":

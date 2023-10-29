@@ -54,7 +54,7 @@ class STDPConv(nn.Module):
     网络中的构造：
         1、赢者通吃+侧抑制(winner take all+ Adaptive lateral inhibitory connection)
         2、适应性阈值平衡(Adaptive threshold balance, ATB)
-        3、适应性突触滤波器(Adaptive synaptic filter, ASF)
+        3、适应性突触滤波器(Adaptive synaptic filter, ASF) --> 全连接层中没有
         ASF根据阈值计算，所以必须跟ATB一起进行
     args:
         :params
@@ -208,6 +208,81 @@ class STDPConv(nn.Module):
         self.lif.n_reset()
         self.trace = None
         self.dw = 0    # 将权重变化量清0
+
+
+class STDPlinear(nn.Module):
+    """
+        STDP更新权重的全连接层
+        网络结构:
+            1、全连接层; 2、LIF(spiking neuron);
+        网络中的构造：
+            1、赢者通吃+侧抑制(winner take all+ Adaptive lateral inhibitory connection)
+            2、适应性阈值平衡(Adaptive threshold balance, ATB)
+        args:
+            :params
+            in_planes: 全连接层输入神经元数
+            out_planes: 全连接层输出神经元数
+            decay: LIF的衰减因子
+            decay_trace: STDP计算trace时的衰减因子
+            offset: 计算梯度时与trace相减的偏置
+            inh: 侧抑制的抑制率(mode="max", 自适应性阈值)
+            time_window: 时间窗口
+        """
+    def __init__(self, in_planes, out_planes,
+                 decay=0.2, decay_trace=0.99, offset=0.3,
+                 inh=1.625, time_window=10):
+        super().__init__()
+        self.linear = nn.Linear(in_planes, out_planes, bias=False)
+        self.lif = LIFSTDP(decay=decay, mem_detach=True)
+        self.WTA = WTALayer(k=1)  # 赢者通吃(全连接，每一批所有神经元只有一个k=1放电)
+        # 侧抑制
+        self.lateralinh = LateralInhibition(self.lif, inh, mode="max")  # 维度为(N,C)所以使用max就可以了
+        # STDP参数
+        self.trace = None
+        self.decay_trace = decay_trace
+        self.offset = offset
+
+        self.time_window= time_window
+        self.dw = 0  # STDP的改变的权重变化量（/batch*T）
+
+    def forward(self, x):
+        pass
+
+    def STDP(self):
+        """
+        利用STDP获得权重的变化量
+        所有的结构都会在这个过程中利用
+        args:
+            :x : [B,C] -- 突触前峰(若包含时间就将其降维到B中)
+        return:
+            :s是脉冲 (B,C)
+            :dw更新量 (out_planes,in_planes)
+        """
+        x = x.clone().detach()  # 突触前的峰
+        i = self.linear(x)  # 输入电流(经过卷积后)
+        with torch.no_grad():
+            s = self.mem_update(i)  # 输出脉冲
+            trace = self.cal_trace(x)  # 通过突触前峰更新trace
+            x.data += trace - x.data - self.offset  # x变为trace(求导得出的值)
+        dw = torch.autograd.grad(outputs=i, inputs=self.linear.weight, grad_outputs=s)[0]
+        # print(x.size(0))
+        dw /= x.size(0)  # 批次维度在求导时相加，除去
+        return s, dw
+
+    def cal_trace(self, x):
+        """
+        计算trace
+        x : [B,C] -- 突触前峰
+        """
+        if self.trace is None:
+            self.trace = nn.Parameter(x.clone().detach(), requires_grad=False)
+        else:
+            self.trace *= self.decay_trace
+            self.trace += x
+        return self.trace.detach()
+
+    def mem_update(self):
+        pass
 
 
 class MNISTnet(nn.Module):

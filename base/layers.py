@@ -166,8 +166,9 @@ class LateralInhibition(nn.Module):
         self.mode = mode
 
     def forward(self, x: torch.Tensor, xori=None):
-        # x.shape = [N, C, W, H]
-        # ret.shape = [N, C, W, H]
+        # x.shape = [N, C, H, W]
+        # ret.shape = [N, C, H, W]
+        # linear shape [N, C]
         if self.mode == "constant":
             self.node.mem = self.node.mem - self.inh * (x.max(1, True)[0] - x)
         elif self.mode == "max":

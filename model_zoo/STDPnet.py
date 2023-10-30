@@ -157,9 +157,11 @@ class STDPConv(nn.Module):
         args:
             current: 卷积后的电流(B,C,H,W)
         retuen:
-            维度C上的最大电流，阈值（ATB 确保不会因电流过大而丢失信息。）
+            维度B上的最大电流，阈值（ATB 确保不会因电流过大而丢失信息。）
+            维度B上的最大电流，阈值（ATB 确保不会因电流过大而丢失信息。）
+            (文章中是维度B上的，而程序中是维度C上的，需要调试)
         """
-        thre_max = current.max(0, True)[0].max(2, True)[0].max(3, True)[0]+0.0001
+        thre_max = current.max(1, True)[1].max(2, True)[0].max(3, True)[0]+0.0001
         self.lif.threshold.data = thre_max # 更改LIF的阈值
         return thre_max
 
@@ -180,7 +182,10 @@ class STDPConv(nn.Module):
         """
         将STDP带来的权重变化量放入权重梯度中，然后使用优化器更新权重
         """
-        self.conv.weight.grad.data = -self.dw
+        if self.conv.weight.grad is None:
+            self.conv.weight.grad = -self.dw
+        else:
+            self.conv.weight.grad.data = -self.dw
 
     def normweight(self, clip=False):
         """
@@ -248,7 +253,7 @@ class STDPlinear(nn.Module):
     def forward(self, x):
         pass
 
-    def STDP(self):
+    def STDP(self, x):
         """
         利用STDP获得权重的变化量
         所有的结构都会在这个过程中利用
@@ -281,8 +286,29 @@ class STDPlinear(nn.Module):
             self.trace += x
         return self.trace.detach()
 
-    def mem_update(self):
-        pass
+    def mem_update(self, x):
+        """
+        LIF的更新:(经过赢着通吃)
+        赢者通吃+侧抑制(winner take all+ Adaptive lateral inhibitory connection)
+        args:
+            x: 通过全连接后的输入电流
+        return:
+            spiking: 输出的脉冲0/1
+        """
+        xori = x
+        x = self.lif(x)  # 通过LIF后的脉冲
+        if x.max() > 0:  # 判断有没有脉冲产生
+            x = self.WTA(x)  # 赢者通吃(winner take all)
+            self.lateralinh(x, xori)  # 抑制不放电神经元的膜电位大小
+        return x
+
+    def reset(self):
+        """
+        重置: 1、LIF的膜电位和spiking; 2、STDP的trace
+        """
+        self.lif.n_reset()
+        self.trace = None
+        self.dw = 0    # 将权重变化量清0
 
 
 class MNISTnet(nn.Module):
@@ -298,5 +324,10 @@ class MNISTnet(nn.Module):
 if __name__ == "__main__":
     snn = STDPConv(in_planes=1, out_planes=12,
                  kernel_size=3, stride=1, padding=1, groups=1)
-    # snn.STDP(torch.ones((3, 1, 3, 3)))
-    # print(snn.STDP(torch.ones((3,1,3,3))))
+
+    snn(torch.ones((3, 1, 3, 3)))
+    snn.normgrad()
+    snn.normweight()
+
+
+

@@ -172,7 +172,7 @@ class LateralInhibition(nn.Module):
         if self.mode == "constant":
             self.node.mem = self.node.mem - self.inh * (x.max(1, True)[0] - x)
         elif self.mode == "max":
-            self.node.mem = self.node.mem - self.inh * xori.max(1, True)[0] .detach() * (x.max(1, True)[0] - x)
+            self.node.mem = self.node.mem - self.inh * xori.max(1, True)[0].detach() * (x.max(1, True)[0] - x)
         elif self.mode == "threshold":
             """
             x.max(1, True)[0]: 经过赢者通吃后，c维度只有一个放电，或者不放电

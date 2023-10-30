@@ -87,7 +87,7 @@ class STDPConv(nn.Module):
         self.offset = offset
 
         self.time_window = time_window
-        self.dw = 0 # STDP的改变的权重变化量（/batch*T）
+        self.dw = 0. # STDP的改变的权重变化量（/batch*T）
 
     def forward(self, x):
         """
@@ -97,7 +97,8 @@ class STDPConv(nn.Module):
             :spikes: 是脉冲 (B,C,H,W)
         """
         spikes, dw = self.STDP(x)
-        self.dw += dw/self.time_window
+        if self.training:  # 是否训练
+            self.dw += dw/self.time_window
 
         return spikes
 
@@ -117,11 +118,15 @@ class STDPConv(nn.Module):
             thre_max = self.getthresh(i.detach())  # 自适应性阈值
             i_ASF = self.ASFilter(i, thre_max)  # 通过适应阈值对电流进行滤波
             s = self.mem_update(i_ASF)  # 输出脉冲
-            trace = self.cal_trace(x)  # 通过突触前峰更新trace
-            x.data += trace - x.data - self.offset  # x变为trace(求导得出的值)
-        dw = torch.autograd.grad(outputs=i, inputs=self.conv.weight, grad_outputs=s)[0]
-        # print(x.size(0))
-        dw /= x.size(0)  # 批次维度在求导时相加，除去
+            if self.training:   # 是否训练
+                trace = self.cal_trace(x)  # 通过突触前峰更新trace
+                x.data += trace - x.data - self.offset  # x变为trace(求导得出的值)
+        if self.training:   # 是否训练
+            dw = torch.autograd.grad(outputs=i, inputs=self.conv.weight, grad_outputs=s)[0]
+            # print(x.size(0))
+            dw /= x.size(0)  # 批次维度在求导时相加，除去
+        else:
+            dw = 0.
         return s, dw
 
     def cal_trace(self, x):
@@ -173,7 +178,7 @@ class STDPConv(nn.Module):
         return：
             current_ASF: 滤波后的电流
         """
-        current = current.clamp(min=0)
+        current = current.clamp(min=0)      # 文章中并没写明裁剪电流
         current_ASF = thre / (1 + torch.exp(-(current - 4 * thre / 10) * (8 / thre)))
         return current_ASF
 
@@ -200,14 +205,14 @@ class STDPConv(nn.Module):
             N, C, H, W = self.conv.weight.data.shape
 
             avg = self.conv.weight.data.mean(1, True).mean(2, True).mean(3, True)   # 每个批次的均值不一样
-            self.conv.weight.data -= avg
             # 将除了批次维度的其他所有维度全部集中在第2维上，然后可以求出批次上的标准差
             tmp = self.conv.weight.data.reshape(N, 1, -1, 1)
+            self.conv.weight.data -= avg
             self.conv.weight.data /= tmp.std(2, unbiased=False, keepdim=True)   # 不使用无偏标准差
 
     def reset(self):
         """
-        重置: 1、LIF的膜电位和spiking; 2、STDP的trace
+        重置: 1、LIF的膜电位和spiking; 2、STDP的trace; 3、梯度;
         """
         self.lif.n_reset()
         self.trace = None
@@ -248,9 +253,23 @@ class STDPlinear(nn.Module):
 
         self.time_window= time_window
         self.dw = 0  # STDP的改变的权重变化量（/batch*T）
+        # 适应性阈值平衡参数
+        self.thre_init = True
+        self.threshold = torch.ones(out_planes, device=device) *10
 
     def forward(self, x):
-        pass
+        """
+       args:
+           x: 输入脉冲(B, C)
+       return:
+           :spikes: 是脉冲 (B,C)
+       """
+        current, spikes, dw = self.STDP(x)
+        if self.training:   # 是否训练
+            self.getthresh(current.detach(), spikes.detach())   # 全连接在测试的时候似乎不用阈值平衡
+            self.dw += dw / self.time_window
+
+        return spikes
 
     def STDP(self, x):
         """
@@ -259,6 +278,7 @@ class STDPlinear(nn.Module):
         args:
             :x : [B,C] -- 突触前峰(若包含时间就将其降维到B中)
         return:
+            i 经过全连接后的电流
             :s是脉冲 (B,C)
             :dw更新量 (out_planes,in_planes)
         """
@@ -266,12 +286,16 @@ class STDPlinear(nn.Module):
         i = self.linear(x)  # 输入电流(经过卷积后)
         with torch.no_grad():
             s = self.mem_update(i)  # 输出脉冲
-            trace = self.cal_trace(x)  # 通过突触前峰更新trace
-            x.data += trace - x.data - self.offset  # x变为trace(求导得出的值)
-        dw = torch.autograd.grad(outputs=i, inputs=self.linear.weight, grad_outputs=s)[0]
-        # print(x.size(0))
-        dw /= x.size(0)  # 批次维度在求导时相加，除去
-        return s, dw
+            if self.training:  # 是否训练
+                trace = self.cal_trace(x)  # 通过突触前峰更新trace
+                x.data += trace - x.data - self.offset  # x变为trace(求导得出的值)
+        if self.training:  # 是否训练
+            dw = torch.autograd.grad(outputs=i, inputs=self.linear.weight, grad_outputs=s)[0]
+            # print(x.size(0))
+            dw /= x.size(0)  # 批次维度在求导时相加，除去
+        else:
+            dw = 0.
+        return i, s, dw
 
     def cal_trace(self, x):
         """
@@ -301,13 +325,55 @@ class STDPlinear(nn.Module):
             self.lateralinh(x, xori)  # 抑制不放电神经元的膜电位大小
         return x
 
+    def getthresh(self, current, s_post, plus=0.001):
+        """
+        适应性阈值平衡(Adaptive threshold balance, ATB)
+        args:
+            current: 全连接后的电流(B,C)
+            s_post: 通过LIF后，神经元发放脉冲(B,C)
+        retuen:
+            None
+        """
+        if self.thre_init:
+            self.node.threshold = self.threshold
+            self.thre_init = False
+        self.node.threshold += (plus * current * s_post).sum(0)
+        tmp = self.node.threshold.max() - 350
+        if tmp > 0:
+            self.node.threshold -= tmp
+
+    def normgrad(self):
+        """
+        将STDP带来的权重变化量放入权重梯度中，然后使用优化器更新权重
+        """
+        if self.conv.weight.grad is None:
+            self.conv.weight.grad = -self.dw
+        else:
+            self.conv.weight.grad.data = -self.dw
+
+    def normweight(self, clip=False):
+        """
+        权重在更新后标准化，防止它们发散或移动
+        self.conv.weight --> (out_planes,in_planes)
+        args:
+            clip: 是否裁剪权重
+        """
+        if clip:
+            self.linear.weight.data = torch. \
+                clamp(self.linear.weight.data, min=0, max=1.0)
+        else:
+            self.linear.weight.data = torch. \
+                clamp(self.linear.weight.data, min=0, max=1.0)  # 文章似乎没有提及裁剪权重的情况
+            self.linear.weight.data /= self.linear.weight.data.mean(1, True) / 0.01 # 代码中似乎实现的是除以最大值
+
     def reset(self):
         """
-        重置: 1、LIF的膜电位和spiking; 2、STDP的trace
+        重置: 1、LIF的膜电位和spiking; 2、STDP的trace; 3、梯度;
         """
         self.lif.n_reset()
         self.trace = None
         self.dw = 0    # 将权重变化量清0
+        # self.thre_init = True     # 4、适应性阈值平衡参数
 
 
 class MNISTnet(nn.Module):
@@ -324,9 +390,11 @@ if __name__ == "__main__":
     snn = STDPConv(in_planes=1, out_planes=12,
                  kernel_size=3, stride=1, padding=1, groups=1)
 
+    # snn.train()
+    snn.eval()
     snn(torch.ones((3, 1, 3, 3)))
-    snn.normgrad()
-    snn.normweight()
+    # snn.normgrad()
+    # snn.normweight()
 
 
 

@@ -89,7 +89,7 @@ class VotingLayer(nn.Module):
     这是无监督学习使用投票层时，唯一使用标签的步骤
     reference : Diehl, P. U., & Cook, M. (2015). Unsupervised learning of digit recognition using spike-timing-dependent plasticity. Frontiers in Computational Neuroscience, 9, 99.
     """
-    def __init__(self, label_shape: int=10, alpha=0.5):
+    def __init__(self, label_shape: int=10, alpha=0.1):
         super().__init__()
         self.n_labels = label_shape  # 标签类别数(如MNIST : 10)
         self.assignments = None

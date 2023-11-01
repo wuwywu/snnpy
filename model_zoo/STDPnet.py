@@ -40,10 +40,10 @@ setup_seed(110)
 
 parser = argparse.ArgumentParser(description="STDP框架研究")
 
-parser.add_argument('--batch', type=int, default=500, help='批次大小')
-parser.add_argument('--lr', type=float, default=0.5, help='学习率')
+parser.add_argument('--batch', type=int, default=1000, help='批次大小')
+parser.add_argument('--lr', type=float, default=1., help='学习率')
 parser.add_argument('--epoch', type=int, default=100, help='学习周期')
-parser.add_argument('--time_window', type=int, default=10, help='LIF时间窗口')
+parser.add_argument('--time_window', type=int, default=100, help='LIF时间窗口')
 
 args = parser.parse_args()
 
@@ -167,8 +167,8 @@ class STDPConv(nn.Module):
             维度B上的最大电流，阈值（ATB 确保不会因电流过大而丢失信息。）
             (文章中是维度B上的，而程序中是维度C上的，需要调试)
         """
-        # thre_max = current.max(1, True)[0].max(2, True)[0].max(3, True)[0]+0.0001
-        thre_max = current.max(0, True)[0].max(2, True)[0].max(3, True)[0]+0.0001
+        thre_max = current.max(1, True)[0].max(2, True)[0].max(3, True)[0]+0.0001
+        # thre_max = current.max(0, True)[0].max(2, True)[0].max(3, True)[0]+0.0001
         self.lif.threshold.data = thre_max # 更改LIF的阈值
         return thre_max
 
@@ -181,7 +181,7 @@ class STDPConv(nn.Module):
         return：
             current_ASF: 滤波后的电流
         """
-        current = current.clamp(min=0)      # 文章中并没写明裁剪电流
+        current = current.clamp(min=0)      # 文章中并没写明裁剪电流(需要调试,影响收敛速度)
         current_ASF = thre / (1 + torch.exp(-(current - 4 * thre / 10) * (8 / thre)))
         return current_ASF
 
@@ -261,15 +261,15 @@ class STDPLinear(nn.Module):
 
     def forward(self, x, time_window=10):
         """
-       args:
+        args:
            x: 输入脉冲(B, C)
            time_window: 时间窗口
-       return:
+        return:
            :spikes: 是脉冲 (B,C)
-       """
+        """
         current, spikes, dw = self.STDP(x)
+        self.getthresh(current.detach(), spikes.detach())  # 全连接在测试的时候似乎不用阈值平衡(需要调试)
         if self.training:   # 是否训练
-            self.getthresh(current.detach(), spikes.detach())   # 全连接在测试的时候似乎不用阈值平衡
             self.dw += dw / time_window
 
         return spikes
@@ -368,10 +368,12 @@ class STDPLinear(nn.Module):
             self.linear.weight.data = torch. \
                 clamp(self.linear.weight.data, min=0, max=1.0)
         else:
+            # 文章似乎没有提及裁剪权重的情况(需要调试).似乎对收敛速影响特别大
             self.linear.weight.data = torch. \
-                clamp(self.linear.weight.data, min=0, max=1.0)  # 文章似乎没有提及裁剪权重的情况
-            # self.linear.weight.data /= self.linear.weight.data.mean(1, keepdims=True) / 0.01 # 代码中似乎实现的是除以最大值
-            self.linear.weight.data /= self.linear.weight.data.max(1, True)[0] / 0.1
+                clamp(self.linear.weight.data, min=0, max=1.0)
+            # 用平均值的效果很差
+            # self.linear.weight.data /= self.linear.weight.data.mean(0, keepdims=True) / 0.01 # .mean(1, keepdims=True)
+            self.linear.weight.data /= self.linear.weight.data.max(1, True)[0] / 0.01   # 代码中似乎实现的是除以最大值
 
     def reset(self):
         """
@@ -380,7 +382,7 @@ class STDPLinear(nn.Module):
         self.lif.n_reset()
         self.trace = None
         self.dw = 0.    # 将权重变化量清0
-        self.thre_init = True     # 4、适应性阈值平衡参数
+        self.thre_init = True     # 4、适应性阈值平衡参数(这个影响非常大)
 
 
 class STDPMaxPool(nn.Module):
@@ -457,10 +459,10 @@ if __name__ == "__main__":
     # print(model.net)
 
     # 数据集
-    transform = transforms.Compose([transforms.Resize((28, 28)),
-                                    transforms.Grayscale(num_output_channels=1),
-                                    transforms.ToTensor()])
-    # transform = transforms.Compose([transforms.ToTensor()])
+    # transform = transforms.Compose([transforms.Resize((28, 28)),
+    #                                 transforms.Grayscale(num_output_channels=1),
+    #                                 transforms.ToTensor()])
+    transform = transforms.Compose([transforms.ToTensor()])
     train_iter = mnist(train=True, batch_size=args.batch, transforms_IN=transform)   # transforms_IN=transform
     test_iter = mnist(train=False, batch_size=args.batch, transforms_IN=transform)
 
@@ -480,14 +482,15 @@ if __name__ == "__main__":
     # optimizer_lin = torch.optim.Adam(list(model.parameters())[conv_lin_params[1]:conv_lin_params[1] + 1], lr=lr)
     optimizer = [optimizer_conv, optimizer_lin]
 
-    time_window_conv = 100  # 时间窗口
-    time_window_lin = 200
+    time_window_conv = 100  # 时间窗口(文章中用的300)
+    time_window_lin = 300
 
-    # ================== 训练(卷积层) ==================
-    model.train()
-    # 卷积层（一层，可能有两层）
-    for layer in range(len(conv_lin_list) - 1):  # 遍历所有卷积层
-        for epoch in range(5):
+    for epoch in range(100):
+        # ================== 训练(卷积层) ==================
+        model.train()
+        # 卷积层（一层，可能有两层）
+        for layer in range(len(conv_lin_list) - 1):  # 遍历所有卷积层
+            # for epoch in range(5):
             for i, (images, labels) in enumerate(train_iter):
                 model.reset(conv_lin_list)  # 重置网络中的卷积层和全连接层
                 images = images.float().to(device)
@@ -500,13 +503,12 @@ if __name__ == "__main__":
                 model.normgrad(conv_lin_list[layer])
                 optimizer[layer].step()
                 model.normweight(conv_lin_list[layer], clip=False)
-            print("layer", layer, "epoch", epoch, 'Done')
+                # print("layer", layer, "epoch", epoch, 'Done')
 
-    # 线性层
-    plus = 0.001  # 控制增长率的系数(线性层适应性阈值平衡)
-    layer = len(conv_lin_list) - 1  # 线性层的位置（就最后一层）
-    for epoch in range(100):
         # ================== 训练(线性层) ==================
+        # 线性层
+        # plus = 0.001  # 控制增长率的系数(线性层适应性阈值平衡)
+        layer = len(conv_lin_list) - 1  # 线性层的位置（就最后一层）
         model.train()
         # 存储全部的spiking和标签
         spikefull = None
@@ -568,8 +570,5 @@ if __name__ == "__main__":
         acc = (result == labelfull).float().mean()
         print("测试：", epoch, acc, 'channel', channel, "n", neuron)
         # print(torch.where(fireRate>0))
-
-
-
 
 

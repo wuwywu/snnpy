@@ -25,9 +25,9 @@ parser = argparse.ArgumentParser(description="输入研究变化参数")
 
 parser.add_argument('--batch', type=int, default=100, help='批次大小')
 parser.add_argument('--lr', type=float, default=0.001, help='学习率')
-parser.add_argument('--epoch', type=int, default=20, help='学习周期')
+parser.add_argument('--epoch', type=int, default=100, help='学习周期')
 parser.add_argument('--time_window', type=int, default=10, help='LIF时间窗口')
-parser.add_argument('--dataset', type=str, default="cifar", choices=["mnist", "fashion", "cifar"], help='数据集类型')
+parser.add_argument('--dataset', type=str, default="fashion", choices=["mnist", "fashion", "cifar"], help='数据集类型')
 
 args = parser.parse_args()
 

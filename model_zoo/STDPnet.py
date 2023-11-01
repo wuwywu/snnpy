@@ -222,6 +222,7 @@ class STDPConv(nn.Module):
         self.dw = 0    # 将权重变化量清0
 
 
+plus = 0.002  # 控制增长率的系数(线性层适应性阈值平衡),文中给的0.001
 class STDPLinear(nn.Module):
     """
         STDP更新权重的全连接层
@@ -333,7 +334,7 @@ class STDPLinear(nn.Module):
             self.lateralinh(x, xori)  # 抑制不放电神经元的膜电位大小
         return x
 
-    def getthresh(self, current, s_post, plus=0.001):
+    def getthresh(self, current, s_post, plus=plus):
         """
         适应性阈值平衡(Adaptive threshold balance, ATB)
         全连接在测试的时候似乎不用阈值平衡
@@ -371,9 +372,9 @@ class STDPLinear(nn.Module):
             # 文章似乎没有提及裁剪权重的情况(需要调试).似乎对收敛速影响特别大
             self.linear.weight.data = torch. \
                 clamp(self.linear.weight.data, min=0, max=1.0)
-            # 用平均值的效果很差
+            # 用平均值的效果很差, 代码中似乎实现的是除以最大值(/0.1, /0.01学习效果会越来越差)
             # self.linear.weight.data /= self.linear.weight.data.mean(0, keepdims=True) / 0.01 # .mean(1, keepdims=True)
-            self.linear.weight.data /= self.linear.weight.data.max(1, True)[0] / 0.01   # 代码中似乎实现的是除以最大值
+            self.linear.weight.data /= self.linear.weight.data.max(1, True)[0] / 0.1
 
     def reset(self):
         """
@@ -482,8 +483,12 @@ if __name__ == "__main__":
     # optimizer_lin = torch.optim.Adam(list(model.parameters())[conv_lin_params[1]:conv_lin_params[1] + 1], lr=lr)
     optimizer = [optimizer_conv, optimizer_lin]
 
-    time_window_conv = 100  # 时间窗口(文章中用的300)
+    time_window_conv = 300  # 时间窗口(文章中用的300)
     time_window_lin = 300
+
+    # 创建编码器 2、泊松编码
+    # encoder_conv = encoder(schemes=2, time_window=time_window_conv)
+    # encoder_lin = encoder(schemes=2, time_window=time_window_lin)
 
     for epoch in range(100):
         # ================== 训练(卷积层) ==================
@@ -495,6 +500,7 @@ if __name__ == "__main__":
                 model.reset(conv_lin_list)  # 重置网络中的卷积层和全连接层
                 images = images.float().to(device)
                 labels = labels.to(device)
+                # images = encoder_conv(images)   # [..., t]
                 fireRate = 0
                 for t in range(time_window_conv):
                     spikes = model(images, 0, conv_lin_list[layer], time_window_conv)
@@ -507,7 +513,6 @@ if __name__ == "__main__":
 
         # ================== 训练(线性层) ==================
         # 线性层
-        # plus = 0.001  # 控制增长率的系数(线性层适应性阈值平衡)
         layer = len(conv_lin_list) - 1  # 线性层的位置（就最后一层）
         model.train()
         # 存储全部的spiking和标签
@@ -517,6 +522,7 @@ if __name__ == "__main__":
             model.reset(conv_lin_list)  # 重置网络中的卷积层和全连接层
             images = images.float().to(device)
             labels = labels.to(device)
+            # images = encoder_lin(images)  # [..., t]
             fireRate = 0
             for t in range(time_window_lin):
                 spikes = model(images, 0, conv_lin_list[layer], time_window_lin)    # [B1,C]
@@ -553,6 +559,7 @@ if __name__ == "__main__":
             model.reset(conv_lin_list)  # 重置网络中的卷积层和全连接层
             images = images.float().to(device)
             labels = labels.to(device)
+            # images = encoder_lin(images)  # [..., t]
             fireRate = 0
             with torch.no_grad():
                 for t in range(time_window_lin):

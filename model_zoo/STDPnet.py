@@ -41,7 +41,7 @@ setup_seed(110)
 parser = argparse.ArgumentParser(description="STDP框架研究")
 
 parser.add_argument('--batch', type=int, default=500, help='批次大小')
-parser.add_argument('--lr', type=float, default=0.1, help='学习率')
+parser.add_argument('--lr', type=float, default=0.5, help='学习率')
 parser.add_argument('--epoch', type=int, default=100, help='学习周期')
 parser.add_argument('--time_window', type=int, default=10, help='LIF时间窗口')
 
@@ -461,7 +461,7 @@ if __name__ == "__main__":
                                     transforms.Grayscale(num_output_channels=1),
                                     transforms.ToTensor()])
     # transform = transforms.Compose([transforms.ToTensor()])
-    train_iter = mnist(train=True, batch_size=args.batch, transforms_IN=transform)
+    train_iter = mnist(train=True, batch_size=args.batch, transforms_IN=transform)   # transforms_IN=transform
     test_iter = mnist(train=False, batch_size=args.batch, transforms_IN=transform)
 
     conv_lin_params = [0, 3]  # 卷积和的参数所在的位置(告诉优化器要学习的参数在哪)
@@ -502,12 +502,12 @@ if __name__ == "__main__":
                 model.normweight(conv_lin_list[layer], clip=False)
             print("layer", layer, "epoch", epoch, 'Done')
 
+    # 线性层
+    plus = 0.001  # 控制增长率的系数(线性层适应性阈值平衡)
+    layer = len(conv_lin_list) - 1  # 线性层的位置（就最后一层）
     for epoch in range(100):
         # ================== 训练(线性层) ==================
         model.train()
-        # 线性层
-        plus = 0.001    # 控制增长率的系数(线性层适应性阈值平衡)
-        layer = len(conv_lin_list)-1    # 线性层的位置（就最后一层）
         # 存储全部的spiking和标签
         spikefull = None
         labelfull = None
@@ -537,6 +537,9 @@ if __name__ == "__main__":
         result = model.voting(spikefull)
         acc = (result == labelfull).float().mean()
         print("训练：", epoch, acc, 'channel', channel, "n", neuron)
+
+        # 减少学习率
+        lr_scheduler(optimizer[layer], epoch, init_lr=lr, lr_decay_epoch=20)
 
         # ================== 测试 ==================
         model.eval()

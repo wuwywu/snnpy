@@ -40,7 +40,7 @@ setup_seed(110)
 
 parser = argparse.ArgumentParser(description="STDP框架研究")
 
-parser.add_argument('--batch', type=int, default=1000, help='批次大小')
+parser.add_argument('--batch', type=int, default=1024, help='批次大小')
 parser.add_argument('--lr', type=float, default=1., help='学习率')
 parser.add_argument('--epoch', type=int, default=100, help='学习周期')
 parser.add_argument('--time_window', type=int, default=100, help='LIF时间窗口')
@@ -416,19 +416,24 @@ class Normliaze(nn.Module):
 
 
 inh = 25  # 调节抑制程度的系数(全连接层)，文中似乎没有说明全连接层的问题
+inh2=1.625
 channel = 12    # 卷积层的输出特征图数
 neuron = 6400   # 投票层的神经元数量
 class MNISTnet(nn.Module):
     def __init__(self):
         super().__init__()
         self.net = nn.ModuleList([
-            STDPConv(in_planes=1, out_planes=channel, kernel_size=3,
+            STDPConv(in_planes=1, out_planes=channel, kernel_size=5,
                      stride=1, padding=1, groups=1, decay=0.2,
                      decay_trace=0.99, offset=0.3, inh=1.625),
             STDPMaxPool(2, 2, 0),
+            # STDPConv(12, 48, 3, 1, 1, 1, inh=inh2),
+            # STDPMaxPool(2, 2, 0, static=True),
+            # Normliaze(),
+
             Normliaze(),
             STDPFlatten(start_dim=1),
-            STDPLinear(196 * channel, neuron, inh=inh)
+            STDPLinear(169* channel, neuron, inh=inh)   # 5--169, 3--196
         ])
 
         self.voting = VotingLayer(label_shape=10)
@@ -490,12 +495,11 @@ if __name__ == "__main__":
     # encoder_conv = encoder(schemes=2, time_window=time_window_conv)
     # encoder_lin = encoder(schemes=2, time_window=time_window_lin)
 
-    for epoch in range(100):
-        # ================== 训练(卷积层) ==================
-        model.train()
-        # 卷积层（一层，可能有两层）
-        for layer in range(len(conv_lin_list) - 1):  # 遍历所有卷积层
-            # for epoch in range(5):
+    # ================== 训练(卷积层) ==================
+    model.train()
+    # 卷积层（一层，可能有两层）
+    for layer in range(len(conv_lin_list) - 1):  # 遍历所有卷积层
+        for epoch in range(5):
             for i, (images, labels) in enumerate(train_iter):
                 model.reset(conv_lin_list)  # 重置网络中的卷积层和全连接层
                 images = images.float().to(device)
@@ -509,7 +513,9 @@ if __name__ == "__main__":
                 model.normgrad(conv_lin_list[layer])
                 optimizer[layer].step()
                 model.normweight(conv_lin_list[layer], clip=False)
-                # print("layer", layer, "epoch", epoch, 'Done')
+            print("layer", layer, "epoch", epoch, 'Done')
+
+    for epoch in range(100):
 
         # ================== 训练(线性层) ==================
         # 线性层
@@ -547,7 +553,7 @@ if __name__ == "__main__":
         print("训练：", epoch, acc, 'channel', channel, "n", neuron)
 
         # 减少学习率
-        lr_scheduler(optimizer[layer], epoch, init_lr=lr, lr_decay_epoch=20)
+        # lr_scheduler(optimizer[layer], epoch, init_lr=lr, lr_decay_epoch=20)
 
         # ================== 测试 ==================
         model.eval()

@@ -40,8 +40,8 @@ setup_seed(110)
 
 parser = argparse.ArgumentParser(description="STDP框架研究")
 
-parser.add_argument('--batch', type=int, default=1024, help='批次大小')
-parser.add_argument('--lr', type=float, default=1., help='学习率')
+parser.add_argument('--batch', type=int, default=500, help='批次大小')
+parser.add_argument('--lr', type=float, default=0.1, help='学习率')
 parser.add_argument('--epoch', type=int, default=100, help='学习周期')
 parser.add_argument('--time_window', type=int, default=100, help='LIF时间窗口')
 
@@ -167,8 +167,8 @@ class STDPConv(nn.Module):
             维度B上的最大电流，阈值（ATB 确保不会因电流过大而丢失信息。）
             (文章中是维度B上的，而程序中是维度C上的，需要调试)
         """
-        thre_max = current.max(1, True)[0].max(2, True)[0].max(3, True)[0]+0.0001
-        # thre_max = current.max(0, True)[0].max(2, True)[0].max(3, True)[0]+0.0001
+        # thre_max = current.max(1, True)[0].max(2, True)[0].max(3, True)[0]+0.0001
+        thre_max = current.max(0, True)[0].max(2, True)[0].max(3, True)[0]+0.0001
         self.lif.threshold.data = thre_max # 更改LIF的阈值
         return thre_max
 

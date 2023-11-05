@@ -65,6 +65,30 @@ def setup_seed(seed):
     os.environ['PYTHONHASHSEED'] = str(seed)    # 禁止hash随机化
 
 
+class Checkpoint(nn.Module):
+    def __init__(self, model, optimizer):
+        super().__init__()
+        self.model = model
+        self.optimizer = optimizer
+
+    def save_checkpoint(self, epoch, filename):
+        checkpoint = {
+            'epoch': epoch,
+            'model_state_dict': self.model.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+        }
+        torch.save(checkpoint, filename)
+        print(f"Checkpoint saved at epoch {epoch}")
+
+    def load_checkpoint(self, filename):
+        checkpoint = torch.load(filename)
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        epoch = checkpoint['epoch']
+        print(f"Checkpoint loaded from epoch {epoch}")
+        return epoch
+
+
 if __name__=="__main__":
     setup_seed(4)
 

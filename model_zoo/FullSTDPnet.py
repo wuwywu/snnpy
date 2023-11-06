@@ -569,7 +569,7 @@ if __name__ == "__main__":
                 fireRate = 0
                 for t in range(time_window_conv):
                     spikes = model(images, 0, conv_lin_list[layer], time_window_conv)
-                    fireRate += spikes / time_window_conv
+                    fireRate += spikes
                 optimizer[layer].zero_grad()
                 model.normgrad(conv_lin_list[layer])
                 optimizer[layer].step()
@@ -591,7 +591,7 @@ if __name__ == "__main__":
             fireRate = 0
             for t in range(time_window_lin):
                 spikes = model(images, 0, conv_lin_list[layer], time_window_lin)    # [B1,C]
-                fireRate += spikes/time_window_lin
+                fireRate += spikes
 
             # 拼接批次维
             if spikefull is None:
@@ -629,7 +629,7 @@ if __name__ == "__main__":
             with torch.no_grad():
                 for t in range(time_window_lin):
                     spikes = model(images, 0, conv_lin_list[layer], time_window_lin)  # [B1,C]
-                    fireRate += spikes / time_window_lin
+                    fireRate += spikes
                 # 拼接批次维
                 if spikefull is None:
                     spikefull = fireRate

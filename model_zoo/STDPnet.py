@@ -41,8 +41,8 @@ setup_seed(110)
 parser = argparse.ArgumentParser(description="STDP框架研究")
 
 parser.add_argument('--batch', type=int, default=200, help='批次大小')
-parser.add_argument('--lr', type=float, default=0.1, help='学习率')
-parser.add_argument('--epoch', type=int, default=100, help='学习周期')
+parser.add_argument('--lr', type=float, default=0.05, help='学习率')
+parser.add_argument('--epoch', type=int, default=300, help='学习周期')
 parser.add_argument('--time_window', type=int, default=100, help='LIF时间窗口')
 
 args = parser.parse_args()
@@ -495,11 +495,12 @@ if __name__ == "__main__":
     # encoder_conv = encoder(schemes=2, time_window=time_window_conv)
     # encoder_lin = encoder(schemes=2, time_window=time_window_lin)
 
-    # ================== 训练(卷积层) ==================
-    model.train()
-    # 卷积层（一层，可能有两层）
-    for layer in range(len(conv_lin_list) - 1):  # 遍历所有卷积层
-        for epoch in range(5):
+    for epoch in range(100):
+        # ================== 训练(卷积层) ==================
+        model.train()
+        # 卷积层（一层，可能有两层）
+        for layer in range(len(conv_lin_list) - 1):  # 遍历所有卷积层
+            # for epoch in range(5):
             for i, (images, labels) in enumerate(train_iter):
                 model.reset(conv_lin_list)  # 重置网络中的卷积层和全连接层
                 images = images.float().to(device)
@@ -508,19 +509,17 @@ if __name__ == "__main__":
                 fireRate = 0
                 for t in range(time_window_conv):
                     spikes = model(images, 0, conv_lin_list[layer], time_window_conv)
-                    fireRate += spikes / time_window_conv
+                    fireRate += spikes
                 optimizer[layer].zero_grad()
                 model.normgrad(conv_lin_list[layer])
                 optimizer[layer].step()
                 model.normweight(conv_lin_list[layer], clip=False)
-            print("layer", layer, "epoch", epoch, 'Done')
-
-    for epoch in range(100):
+                # print("layer", layer, "epoch", epoch, 'Done')
 
         # ================== 训练(线性层) ==================
         # 线性层
         layer = len(conv_lin_list) - 1  # 线性层的位置（就最后一层）
-        model.train()
+        # model.train()
         # 存储全部的spiking和标签
         spikefull = None
         labelfull = None
@@ -532,7 +531,7 @@ if __name__ == "__main__":
             fireRate = 0
             for t in range(time_window_lin):
                 spikes = model(images, 0, conv_lin_list[layer], time_window_lin)    # [B1,C]
-                fireRate += spikes/time_window_lin
+                fireRate += spikes
 
             # 拼接批次维
             if spikefull is None:
@@ -570,7 +569,7 @@ if __name__ == "__main__":
             with torch.no_grad():
                 for t in range(time_window_lin):
                     spikes = model(images, 0, conv_lin_list[layer], time_window_lin)  # [B1,C]
-                    fireRate += spikes / time_window_lin
+                    fireRate += spikes
                 # 拼接批次维
                 if spikefull is None:
                     spikefull = fireRate

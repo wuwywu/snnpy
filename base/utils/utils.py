@@ -65,9 +65,8 @@ def setup_seed(seed):
     os.environ['PYTHONHASHSEED'] = str(seed)    # 禁止hash随机化
 
 
-class Checkpoint(nn.Module):
+class Checkpoint:
     def __init__(self, model, optimizer):
-        super().__init__()
         self.model = model
         self.optimizer = optimizer
 

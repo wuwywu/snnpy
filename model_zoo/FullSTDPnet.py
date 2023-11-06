@@ -1,6 +1,6 @@
 # encoding: utf-8
 # Author    : WuY<wuyong@mails.ccnu.edu.com>
-# Datetime  : 2023/10/26
+# Datetime  : 2023/11/06
 # User      : WuY
 # File      : STDPnet.py
 # paper     : Yiting Dong, An unsupervised STDP-based spiking neural network inspired by biologically plausible learning rules and connections
@@ -10,6 +10,8 @@
     卷积层(neuron) --> 2x2最大池化层 --> 尖峰归一化层 --> 全连接层(neuron)
     convolutional layer --> 2*2 max pooling layer --> spiking
 normalization layer -->  fully connected layer
+
+使用双边STDP，包含pre-post增大，post-pre减小
 """
 
 import os
@@ -36,16 +38,22 @@ from base.nodes import LIFbackEI
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # 固定随机种子
-setup_seed(110)
+setup_seed(3407) # 42/3407/8888
 
-parser = argparse.ArgumentParser(description="STDP框架研究")
+def argsGen():
+    parser = argparse.ArgumentParser(description="FullSTDP框架研究")
 
-parser.add_argument('--batch', type=int, default=500, help='批次大小')
-parser.add_argument('--lr', type=float, default=0.1, help='学习率')
-parser.add_argument('--epoch', type=int, default=100, help='学习周期')
-parser.add_argument('--time_window', type=int, default=100, help='LIF时间窗口')
+    parser.add_argument('--batch', type=int, default=500, help='批次大小')
+    parser.add_argument('--lr', type=float, default=1, help='学习率')
+    parser.add_argument('--epoch', type=int, default=100, help='学习周期')
+    parser.add_argument('--time_window', type=int, default=100, help='LIF时间窗口')
+    parser.add_argument('--A1', type=float, default=0.96, help='STDP增大系数')
+    parser.add_argument('--A2', type=float, default=0.53, help='STDP减小系数')
 
-args = parser.parse_args()
+    args = parser.parse_args()
+    return args
+
+args = argsGen()
 
 # STDP的卷积层+neuron
 class STDPConv(nn.Module):
@@ -67,13 +75,13 @@ class STDPConv(nn.Module):
         padding: 卷积的填充
         groups: 批次分组
         decay: LIF的衰减因子
-        decay_trace: STDP计算trace时的衰减因子
-        offset: 计算梯度时与trace相减的偏置
+        decay_trace: STDP计算trace时的衰减因子 pre-pose增强
+        decay_trace2: STDP计算trace2时的衰减因子 post-pre减小
         inh: 侧抑制的抑制率(mode="threshold", 自适应性阈值)
     """
     def __init__(self, in_planes, out_planes,
                  kernel_size, stride, padding, groups,
-                 decay=0.2, decay_trace=0.99, offset=0.3,
+                 decay=0.2, decay_trace=0.99, decay_trace2=0.99,
                  inh=1.625):
         super().__init__()
         self.conv = nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size,
@@ -85,8 +93,9 @@ class STDPConv(nn.Module):
         self.lateralinh = LateralInhibition(self.lif, inh, mode="threshold")
         # STDP参数
         self.trace = None
+        self.trace2 = None
         self.decay_trace = decay_trace
-        self.offset = offset
+        self.decay_trace2 = decay_trace2
 
         self.dw = 0. # STDP的改变的权重变化量（/batch*T）
 
@@ -98,9 +107,9 @@ class STDPConv(nn.Module):
         return:
             :spikes: 是脉冲 (B,C,H,W)
         """
-        spikes, dw = self.STDP(x)
+        spikes, dw, dw2 = self.STDP(x)
         if self.training:  # 是否训练
-            self.dw += dw/time_window
+            self.dw += (args.A1*dw-args.A2*dw2)/(time_window*args.batch)
 
         return spikes
 
@@ -112,7 +121,8 @@ class STDPConv(nn.Module):
             :x : [B,C,H,W] -- 突触前峰(若包含时间就将其降维到B中)
         return:
             :s是脉冲 (B,C,H,W)
-            :dw更新量 (out_planes,in_planes,H,W)
+            :dw更新量 (out_planes,in_planes,H,W) pre-pose增强更新量
+            :dw2 post-pre减小更新量
         """
         x = x.clone().detach()  # 突触前的峰
         i = self.conv(x)  # 输入电流(经过卷积后)
@@ -120,21 +130,31 @@ class STDPConv(nn.Module):
             thre_max = self.getthresh(i.detach())  # 自适应性阈值
             i_ASF = self.ASFilter(i, thre_max)  # 通过适应阈值对电流进行滤波
             s = self.mem_update(i_ASF)  # 输出脉冲
-            if self.training:   # 是否训练
-                trace = self.cal_trace(x)  # 通过突触前峰更新trace
-                x.data += trace - x.data - self.offset  # x变为trace(求导得出的值)
+
+            # 计算trace2(post-pre减小)
+            if self.training:
+                trace2 = self.cal_trace2(s)
+        if self.training:
+            dw2 = torch.autograd.grad(outputs=i, inputs=self.conv.weight,
+                                          retain_graph=True, grad_outputs=trace2)[0]  # post-pre减小更新量
+
+        # 计算trace(pre-pose增强)
         if self.training:   # 是否训练
+            with torch.no_grad():
+                trace = self.cal_trace(x)  # 通过突触前峰更新trace
+                x.data += trace - x.data   # x变为trace(求导得出的值)
             dw = torch.autograd.grad(outputs=i, inputs=self.conv.weight, grad_outputs=s)[0]
-            # print(x.size(0))
-            dw /= x.size(0)  # 批次维度在求导时相加，除去
         else:
             dw = 0.
-        return s, dw
+            dw2 = 0.
+        return s, dw, dw2
 
     def cal_trace(self, x):
         """
         计算trace
         x : [B,C,W,H] -- 突触前峰
+        return:
+            trace2: post-pre减小 trace2
         """
         if self.trace is None:
             self.trace = nn.Parameter(x.clone().detach(), requires_grad=False)
@@ -142,6 +162,21 @@ class STDPConv(nn.Module):
             self.trace *= self.decay_trace
             self.trace += x
         return self.trace.detach()
+
+    def cal_trace2(self, s):
+        """
+        arg:
+            s: 突触前输出脉冲
+        return:
+            trace2: post-pre减小 trace2
+        """
+        if self.trace2 is None:
+            self.trace2 = nn.Parameter(torch.zeros_like(s), requires_grad=False)
+        else:
+            self.trace2 *= self.decay_trace2
+        trace2 = self.trace2.clone().detach()
+        self.trace2 += s
+        return trace2
 
     def mem_update(self, x):
         """
@@ -219,6 +254,7 @@ class STDPConv(nn.Module):
         """
         self.lif.n_reset()
         self.trace = None
+        self.trace2 = None
         self.dw = 0    # 将权重变化量清0
 
 
@@ -236,12 +272,12 @@ class STDPLinear(nn.Module):
             in_planes: 全连接层输入神经元数
             out_planes: 全连接层输出神经元数
             decay: LIF的衰减因子
-            decay_trace: STDP计算trace时的衰减因子
-            offset: 计算梯度时与trace相减的偏置
+            decay_trace: STDP计算trace时的衰减因子 pre-pose增强
+            decay_trace2: STDP计算trace2时的衰减因子 post-pre减小
             inh: 侧抑制的抑制率(mode="max", 自适应性阈值)
         """
     def __init__(self, in_planes, out_planes,
-                 decay=0.2, decay_trace=0.99, offset=0.3,
+                 decay=0.2, decay_trace=0.99, decay_trace2=0.99,
                  inh=1.625):
         super().__init__()
         self.linear = nn.Linear(in_planes, out_planes, bias=False)
@@ -252,13 +288,13 @@ class STDPLinear(nn.Module):
         self.lateralinh = LateralInhibition(self.lif, inh, mode="max")  # 维度为(N,C)所以使用max就可以了
         # STDP参数
         self.trace = None
+        self.trace2 = None
         self.decay_trace = decay_trace
-        self.offset = offset
+        self.decay_trace2 = decay_trace2
 
         self.dw = 0.  # STDP的改变的权重变化量（/batch*T）
         # 适应性阈值平衡参数
         self.thre_init = True
-        # self.threshold = torch.ones(out_planes) *10
 
     def forward(self, x, time_window=10):
         """
@@ -268,10 +304,10 @@ class STDPLinear(nn.Module):
         return:
            :spikes: 是脉冲 (B,C)
         """
-        current, spikes, dw = self.STDP(x)
+        current, spikes, dw, dw2 = self.STDP(x)
         self.getthresh(current.detach(), spikes.detach())  # 全连接在测试的时候似乎不用阈值平衡(需要调试)
         if self.training:   # 是否训练
-            self.dw += dw / time_window
+            self.dw += (args.A1*dw-args.A2*dw2)/(time_window*args.batch)
 
         return spikes
 
@@ -284,23 +320,31 @@ class STDPLinear(nn.Module):
         return:
             i 经过全连接后的电流
             :s是脉冲 (B,C)
-            :dw更新量 (out_planes,in_planes)
+            :dw更新量 (out_planes,in_planes) pre-pose增强更新量
+            :dw2 post-pre减小更新量
         """
         x = x.clone().detach()  # 突触前的峰
         i = self.linear(x)  # 输入电流(经过卷积后)
         with torch.no_grad():
             s = self.mem_update(i)  # 输出脉冲
-            if self.training:  # 是否训练
-                trace = self.cal_trace(x)  # 通过突触前峰更新trace
-                x.data += trace - x.data - self.offset  # x变为trace(求导得出的值)
+
+            # 计算trace2(post-pre减小)
+            if self.training:
+                trace2 = self.cal_trace2(s)
+        if self.training:
+            dw2 = torch.autograd.grad(outputs=i, inputs=self.linear.weight,
+                                      retain_graph=True, grad_outputs=trace2)[0]  # post-pre减小更新量
+
+            # 计算trace(pre-pose增强)
         if self.training:  # 是否训练
+            with torch.no_grad():
+                trace = self.cal_trace(x)  # 通过突触前峰更新trace
+                x.data += trace - x.data  # x变为trace(求导得出的值)
             dw = torch.autograd.grad(outputs=i, inputs=self.linear.weight, grad_outputs=s)[0]
-            # print(x.size(0))
-            dw /= x.size(0)  # 批次维度在求导时相加，除去
-            # print(self.dw)
         else:
             dw = 0.
-        return i, s, dw
+            dw2 = 0.
+        return i, s, dw, dw2
 
     def cal_trace(self, x):
         """
@@ -313,6 +357,21 @@ class STDPLinear(nn.Module):
             self.trace *= self.decay_trace
             self.trace += x
         return self.trace.detach()
+
+    def cal_trace2(self, s):
+        """
+        arg:
+            s: 突触前输出脉冲
+        return:
+            trace2: post-pre减小 trace2
+        """
+        if self.trace2 is None:
+            self.trace2 = nn.Parameter(torch.zeros_like(s), requires_grad=False)
+        else:
+            self.trace2 *= self.decay_trace2
+        trace2 = self.trace2.clone().detach()
+        self.trace2 += s
+        return trace2
 
     def mem_update(self, x):
         """
@@ -382,6 +441,7 @@ class STDPLinear(nn.Module):
         """
         self.lif.n_reset()
         self.trace = None
+        self.trace2 = None
         self.dw = 0.    # 将权重变化量清0
         self.thre_init = True     # 4、适应性阈值平衡参数(这个影响非常大)
 
@@ -425,7 +485,7 @@ class MNISTnet(nn.Module):
         self.net = nn.ModuleList([
             STDPConv(in_planes=1, out_planes=channel, kernel_size=5,
                      stride=1, padding=1, groups=1, decay=0.2,
-                     decay_trace=0.99, offset=0.3, inh=1.625),
+                     decay_trace=0.99, decay_trace2=0.99, inh=1.625),
             STDPMaxPool(2, 2, 0),
             # STDPConv(12, 48, 3, 1, 1, 1, inh=inh2),
             # STDPMaxPool(2, 2, 0, static=True),
@@ -479,10 +539,10 @@ if __name__ == "__main__":
     # print(list(model.parameters())[3:4])
 
     # 创建优化器
-    # print(list(model.named_parameters())[conv_lin_params[0]:conv_lin_params[0] + 1])
-    optimizer_conv = torch.optim.SGD(list(model.parameters())[conv_lin_params[0]:conv_lin_params[0] + 1], lr=0.1)
-    # optimizer_conv = torch.optim.Adam(list(model.parameters())[conv_lin_params[0]:conv_lin_params[0] + 1], lr=0.1)
     lr = args.lr
+    # print(list(model.named_parameters())[conv_lin_params[0]:conv_lin_params[0] + 1])
+    optimizer_conv = torch.optim.SGD(list(model.parameters())[conv_lin_params[0]:conv_lin_params[0] + 1], lr=lr)
+    # optimizer_conv = torch.optim.Adam(list(model.parameters())[conv_lin_params[0]:conv_lin_params[0] + 1], lr=0.1)
     # print(list(model.named_parameters())[conv_lin_params[1]:conv_lin_params[1] + 1])
     optimizer_lin = torch.optim.SGD(list(model.parameters())[conv_lin_params[1]:conv_lin_params[1] + 1], lr=lr)
     # optimizer_lin = torch.optim.Adam(list(model.parameters())[conv_lin_params[1]:conv_lin_params[1] + 1], lr=lr)
@@ -495,11 +555,12 @@ if __name__ == "__main__":
     # encoder_conv = encoder(schemes=2, time_window=time_window_conv)
     # encoder_lin = encoder(schemes=2, time_window=time_window_lin)
 
-    # ================== 训练(卷积层) ==================
-    model.train()
-    # 卷积层（一层，可能有两层）
-    for layer in range(len(conv_lin_list) - 1):  # 遍历所有卷积层
-        for epoch in range(5):
+    for epoch in range(100):
+        # ================== 训练(卷积层) ==================
+        model.train()
+        # 卷积层（一层，可能有两层）
+        for layer in range(len(conv_lin_list) - 1):  # 遍历所有卷积层
+            # for epoch in range(5):
             for i, (images, labels) in enumerate(train_iter):
                 model.reset(conv_lin_list)  # 重置网络中的卷积层和全连接层
                 images = images.float().to(device)
@@ -513,14 +574,12 @@ if __name__ == "__main__":
                 model.normgrad(conv_lin_list[layer])
                 optimizer[layer].step()
                 model.normweight(conv_lin_list[layer], clip=False)
-            print("layer", layer, "epoch", epoch, 'Done')
-
-    for epoch in range(100):
+                # print("layer", layer, "epoch", epoch, 'Done')
 
         # ================== 训练(线性层) ==================
         # 线性层
         layer = len(conv_lin_list) - 1  # 线性层的位置（就最后一层）
-        model.train()
+        # model.train()
         # 存储全部的spiking和标签
         spikefull = None
         labelfull = None

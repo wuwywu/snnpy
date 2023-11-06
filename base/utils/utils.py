@@ -44,7 +44,7 @@ def calc_correct_total(outputs, labels):
     return total, correct
 
 
-def setup_seed(seed):
+def setup_seed(seed=3407):
     """
     为CPU，GPU，所有GPU，numpy，python设置随机数种子，并禁止hash随机化
     :param seed: 随机种子值

@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 
 from base.nodes import LIFNode
 from base.layers import addTLayer, FRLayer
-from base.encoder import encoder
+from base.encoder.encoder import encoder
 from datasets.datasets import mnist
 from base.utils.utils import lr_scheduler, toOneHot, calc_correct_total
 from base_module import BaseModule

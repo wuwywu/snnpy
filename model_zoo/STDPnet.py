@@ -40,7 +40,7 @@ setup_seed(110)
 
 parser = argparse.ArgumentParser(description="STDP框架研究")
 
-parser.add_argument('--batch', type=int, default=500, help='批次大小')
+parser.add_argument('--batch', type=int, default=200, help='批次大小')
 parser.add_argument('--lr', type=float, default=0.1, help='学习率')
 parser.add_argument('--epoch', type=int, default=100, help='学习周期')
 parser.add_argument('--time_window', type=int, default=100, help='LIF时间窗口')

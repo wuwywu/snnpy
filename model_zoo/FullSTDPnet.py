@@ -43,10 +43,10 @@ setup_seed(3407) # 42/3407/8888
 def argsGen():
     parser = argparse.ArgumentParser(description="FullSTDP框架研究")
 
-    parser.add_argument('--batch', type=int, default=1024, help='批次大小')
-    parser.add_argument('--lr', type=float, default=2.4, help='学习率')
-    parser.add_argument('--epoch', type=int, default=200, help='学习周期')
-    parser.add_argument('--time_window', type=int, default=100, help='LIF时间窗口')
+    parser.add_argument('--batch', type=int, default=200, help='批次大小')
+    parser.add_argument('--lr', type=float, default=0.1, help='学习率')
+    parser.add_argument('--epoch', type=int, default=100, help='学习周期')
+    parser.add_argument('--time_window', type=int, default=200, help='LIF时间窗口')
     parser.add_argument('--A1', type=float, default=0.96, help='STDP增大系数')  # 0.96
     parser.add_argument('--A2', type=float, default=0.53, help='STDP减小系数')  # 0.53
 

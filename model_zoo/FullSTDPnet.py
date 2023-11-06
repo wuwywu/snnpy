@@ -43,12 +43,12 @@ setup_seed(3407) # 42/3407/8888
 def argsGen():
     parser = argparse.ArgumentParser(description="FullSTDP框架研究")
 
-    parser.add_argument('--batch', type=int, default=500, help='批次大小')
-    parser.add_argument('--lr', type=float, default=1, help='学习率')
-    parser.add_argument('--epoch', type=int, default=100, help='学习周期')
+    parser.add_argument('--batch', type=int, default=1024, help='批次大小')
+    parser.add_argument('--lr', type=float, default=2.4, help='学习率')
+    parser.add_argument('--epoch', type=int, default=200, help='学习周期')
     parser.add_argument('--time_window', type=int, default=100, help='LIF时间窗口')
-    parser.add_argument('--A1', type=float, default=0.96, help='STDP增大系数')
-    parser.add_argument('--A2', type=float, default=0.53, help='STDP减小系数')
+    parser.add_argument('--A1', type=float, default=0.96, help='STDP增大系数')  # 0.96
+    parser.add_argument('--A2', type=float, default=0.53, help='STDP减小系数')  # 0.53
 
     args = parser.parse_args()
     return args
@@ -109,7 +109,7 @@ class STDPConv(nn.Module):
         """
         spikes, dw, dw2 = self.STDP(x)
         if self.training:  # 是否训练
-            self.dw += (args.A1*dw-args.A2*dw2)/(time_window*args.batch)
+            self.dw += (args.A1*dw-args.A2*dw2)/(time_window*x.size(0))
 
         return spikes
 
@@ -307,7 +307,7 @@ class STDPLinear(nn.Module):
         current, spikes, dw, dw2 = self.STDP(x)
         self.getthresh(current.detach(), spikes.detach())  # 全连接在测试的时候似乎不用阈值平衡(需要调试)
         if self.training:   # 是否训练
-            self.dw += (args.A1*dw-args.A2*dw2)/(time_window*args.batch)
+            self.dw += (args.A1*dw-args.A2*dw2)/(time_window*x.size(0))
 
         return spikes
 
@@ -541,15 +541,15 @@ if __name__ == "__main__":
     # 创建优化器
     lr = args.lr
     # print(list(model.named_parameters())[conv_lin_params[0]:conv_lin_params[0] + 1])
-    optimizer_conv = torch.optim.SGD(list(model.parameters())[conv_lin_params[0]:conv_lin_params[0] + 1], lr=lr)
+    optimizer_conv = torch.optim.SGD(list(model.parameters())[conv_lin_params[0]:conv_lin_params[0] + 1], lr=0.1)
     # optimizer_conv = torch.optim.Adam(list(model.parameters())[conv_lin_params[0]:conv_lin_params[0] + 1], lr=0.1)
     # print(list(model.named_parameters())[conv_lin_params[1]:conv_lin_params[1] + 1])
     optimizer_lin = torch.optim.SGD(list(model.parameters())[conv_lin_params[1]:conv_lin_params[1] + 1], lr=lr)
     # optimizer_lin = torch.optim.Adam(list(model.parameters())[conv_lin_params[1]:conv_lin_params[1] + 1], lr=lr)
     optimizer = [optimizer_conv, optimizer_lin]
 
-    time_window_conv = 300  # 时间窗口(文章中用的300)
-    time_window_lin = 300
+    time_window_conv = args.time_window  # 时间窗口(文章中用的300)
+    time_window_lin = args.time_window
 
     # 创建编码器 2、泊松编码
     # encoder_conv = encoder(schemes=2, time_window=time_window_conv)

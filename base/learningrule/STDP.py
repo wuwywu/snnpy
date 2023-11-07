@@ -93,7 +93,7 @@ class STDP(nn.Module):
         计算trace
         """
         if self.trace is None:
-            self.trace = Parameter(x.clone().detach(), requires_grad=False)
+            self.trace = nn.Parameter(x.clone().detach(), requires_grad=False)
         else:
             self.trace *= self.decay_trace
             self.trace += x

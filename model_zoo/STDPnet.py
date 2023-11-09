@@ -41,7 +41,7 @@ setup_seed(0)
 parser = argparse.ArgumentParser(description="STDP框架研究")
 
 parser.add_argument('--batch', type=int, default=200, help='批次大小')
-parser.add_argument('--lr', type=float, default=0.0001, help='学习率')
+parser.add_argument('--lr', type=float, default=0.1, help='学习率')
 parser.add_argument('--epoch', type=int, default=300, help='学习周期')
 parser.add_argument('--time_window', type=int, default=100, help='LIF时间窗口')
 
@@ -100,7 +100,7 @@ class STDPConv(nn.Module):
         """
         spikes, dw = self.STDP(x)
         if self.training:  # 是否训练
-            self.dw += dw   # /time_window
+            self.dw += dw       # /time_window
 
         return spikes
 
@@ -126,7 +126,7 @@ class STDPConv(nn.Module):
         if self.training:   # 是否训练
             dw = torch.autograd.grad(outputs=i, inputs=self.conv.weight, grad_outputs=s)[0]
             # print(x.size(0))
-            dw /= (i.size(0)*i.size(2)*i.size(3))  # 批次维度在求导时相加, 卷积核经过的相同位置，除去
+            dw /= (i.size(0)*i.size(2)*i.size(3))  # 批次维度在求导时相加, （卷积核经过的相同位置，除去 ）
         else:
             dw = 0.
         return s, dw
@@ -245,7 +245,7 @@ class STDPLinear(nn.Module):
                  inh=1.625):
         super().__init__()
         self.linear = nn.Linear(in_planes, out_planes, bias=False)
-        self.lif = LIFSTDP(decay=decay, mem_detach=True)
+        self.lif = LIFSTDP(decay=decay, mem_detach=True)    # 类似于IF
         self.WTA = WTALayer(k=1)  # 赢者通吃(全连接，每一批所有神经元只有一个k=1放电)
         self.normweight(False)
         # 侧抑制
@@ -271,7 +271,7 @@ class STDPLinear(nn.Module):
         current, spikes, dw = self.STDP(x)
         self.getthresh(current.detach(), spikes.detach())  # 全连接在测试的时候似乎不用阈值平衡(需要调试)
         if self.training:   # 是否训练
-            self.dw += dw # / time_window
+            self.dw += dw       # /time_window
 
         return spikes
 
@@ -296,7 +296,7 @@ class STDPLinear(nn.Module):
         if self.training:  # 是否训练
             dw = torch.autograd.grad(outputs=i, inputs=self.linear.weight, grad_outputs=s)[0]
             # print(x.size(0))
-            # dw /= x.size(0)  # 批次维度在求导时相加，除去
+            dw /= x.size(0)  # 批次维度在求导时相加，除去
             # print(self.dw)
         else:
             dw = 0.
@@ -433,14 +433,23 @@ class MNISTnet(nn.Module):
 
             Normliaze(),
             STDPFlatten(start_dim=1),
-            STDPLinear(196* channel, neuron, inh=inh, decay_trace=0.0, offset=0.0)   # 5--169, 3--196
+            STDPLinear(196* channel, neuron, inh=inh, decay_trace=0.1, offset=0.0)   # 5--169, 3--196 , decay_trace=0.0, offset=0.0
         ])
 
         self.voting = VotingLayer(label_shape=10, alpha=.5) # alpha 指数衰减
 
-    def forward(self, x, inlayer, outlayer, time_window):
-        for i in range(inlayer, outlayer + 1):
-            x = self.net[i](x, time_window)
+    def forward(self, x, inlayer, outlayer, time_window, train_layer=None):
+        if train_layer is None:
+            for i in range(inlayer, outlayer + 1):
+                x = self.net[i](x, time_window)
+        else:
+            for i in range(inlayer, outlayer + 1):
+                if i==train_layer:
+                    self.net[i].train()
+                else:
+                    self.net[i].eval()
+                x = self.net[i](x, time_window)
+
         return x
 
     def normgrad(self, layer):
@@ -493,11 +502,16 @@ if __name__ == "__main__":
     # optimizer_lin = torch.optim.Adam(list(model.parameters())[conv_lin_params[1]:conv_lin_params[1] + 1], lr=lr)
     optimizer = [optimizer_conv, optimizer_lin]
 
-    time_window_conv = 100  # 时间窗口(文章中用的300)
+    time_window_conv = 200  # 时间窗口(文章中用的300)
     time_window_lin = 200
-    # ================== 训练(卷积层) ==================
+
+    # 创建编码器 2、泊松编码
+    # encoder_conv = encoder(schemes=2, time_window=time_window_conv)
+    # encoder_lin = encoder(schemes=2, time_window=time_window_lin)\
+
+    """
+    # ================== 预训练(卷积层) ==================
     model.train()
-    # 卷积层（一层，可能有两层）
     for layer in range(len(conv_lin_list) - 1):  # 遍历所有卷积层
         for epoch in range(3):
             for i, (images, labels) in enumerate(train_iter):
@@ -507,23 +521,41 @@ if __name__ == "__main__":
                 # images = encoder_conv(images)   # [..., t]
                 fireRate = 0
                 for t in range(time_window_conv):
-                    spikes = model(images, 0, conv_lin_list[layer], time_window_conv)
+                    spikes = model(images, 0, conv_lin_list[layer], time_window_conv, train_layer=conv_lin_list[layer])
                     fireRate += spikes
                 optimizer[layer].zero_grad()
                 model.normgrad(conv_lin_list[layer])
                 optimizer[layer].step()
                 model.normweight(conv_lin_list[layer], clip=False)
             print("layer", layer, "epoch", epoch, 'Done')
+    """
 
-    # 创建编码器 2、泊松编码
-    # encoder_conv = encoder(schemes=2, time_window=time_window_conv)
-    # encoder_lin = encoder(schemes=2, time_window=time_window_lin)
-
+    best = 0
     for epoch in range(args.epoch):
+        # ================== 训练(卷积层) ==================
+        model.train()
+        # 卷积层（一层，可能有两层）
+        for layer in range(len(conv_lin_list) - 1):  # 遍历所有卷积层
+            # for epoch in range(3):
+            for i, (images, labels) in enumerate(train_iter):
+                model.reset(conv_lin_list)  # 重置网络中的卷积层和全连接层
+                images = images.float().to(device)
+                labels = labels.to(device)
+                # images = encoder_conv(images)   # [..., t]
+                fireRate = 0
+                for t in range(time_window_conv):
+                    spikes = model(images, 0, conv_lin_list[layer], time_window_conv, train_layer=conv_lin_list[layer])
+                    fireRate += spikes
+                optimizer[layer].zero_grad()
+                model.normgrad(conv_lin_list[layer])
+                optimizer[layer].step()
+                model.normweight(conv_lin_list[layer], clip=False)
+                # print("layer", layer, "epoch", epoch, 'Done')
+
         # ================== 训练(线性层) ==================
         # 线性层
         layer = len(conv_lin_list) - 1  # 线性层的位置（就最后一层）
-        model.train()
+        # model.train()
         # 存储全部的spiking和标签
         spikefull = None
         labelfull = None
@@ -534,7 +566,7 @@ if __name__ == "__main__":
             # images = encoder_lin(images)  # [..., t]
             fireRate = 0
             for t in range(time_window_lin):
-                spikes = model(images, 0, conv_lin_list[layer], time_window_lin)    # [B1,C]
+                spikes = model(images, 0, conv_lin_list[layer], time_window_lin, train_layer=conv_lin_list[layer])    # [B1,C]
                 fireRate += spikes
 
             # 拼接批次维
@@ -587,4 +619,7 @@ if __name__ == "__main__":
         print("测试：", epoch, acc, 'channel', channel, "n", neuron)
         # print(torch.where(fireRate>0))
 
+        if best < acc:
+            best = acc
+        print("test", acc, "best", best)
 

@@ -5,6 +5,7 @@
 # File      : STDPnet.py
 # paper     : Yiting Dong, An unsupervised STDP-based spiking neural network inspired by biologically plausible learning rules and connections
 # doi       : https://doi.org/10.1016/j.neunet.2023.06.019
+# 这个代码按照开源代码修改，与文中有非常大的出入
 """
 文章中的网络结构
     卷积层(neuron) --> 2x2最大池化层 --> 尖峰归一化层 --> 全连接层(neuron)
@@ -16,6 +17,7 @@ import os
 import sys
 sys.path.append(os.path.dirname(__file__))  # 将文件所在地址放入系统调用地址中
 sys.path.append(r"../")
+sys.path.append(r".../")
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -41,7 +43,7 @@ setup_seed(0)
 parser = argparse.ArgumentParser(description="STDP框架研究")
 
 parser.add_argument('--batch', type=int, default=200, help='批次大小')
-parser.add_argument('--lr', type=float, default=0.1, help='学习率')
+parser.add_argument('--lr', type=float, default=0.0001, help='学习率')
 parser.add_argument('--epoch', type=int, default=300, help='学习周期')
 parser.add_argument('--time_window', type=int, default=100, help='LIF时间窗口')
 
@@ -73,7 +75,7 @@ class STDPConv(nn.Module):
     """
     def __init__(self, in_planes, out_planes,
                  kernel_size, stride, padding, groups,
-                 decay=0.2, decay_trace=0.99, offset=0.3,
+                 decay=torch.exp(-1.0 / torch.tensor(100.0)), decay_trace=0.99, offset=0.3,
                  inh=1.625):
         super().__init__()
         self.conv = nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size,
@@ -98,35 +100,45 @@ class STDPConv(nn.Module):
         return:
             :spikes: 是脉冲 (B,C,H,W)
         """
-        spikes, dw = self.STDP(x)
-        if self.training:  # 是否训练
-            self.dw += dw       # /time_window
+        x = x.clone().detach()  # 突触前的峰
+        i = self.conv(x)  # 输入电流(经过卷积后)
+        thre_max = self.getthresh(i)  # 自适应性阈值
+        i_ASF = self.ASFilter(i, thre_max)  # 通过适应阈值对电流进行滤波
 
+        spikes = 0
+        for T in range(time_window):
+            if T == time_window-1:
+                retain_graph = False
+            else:
+                retain_graph = True
+
+            s, dw = self.STDP(i, i_ASF, retain_graph=retain_graph)
+            if self.training:  # 是否训练
+                self.dw += dw       # /time_window
+            spikes += s
+        self.dw *= 1 / (spikes.shape[0] * spikes.shape[2] * spikes.shape[3])  # 批次维度在求导时相加, （卷积核经过的相同位置，除去 ）
+        # print(self.dw)
         return spikes
 
-    def STDP(self, x):
+    def STDP(self, current, i_ASF, retain_graph=True):
         """
         利用STDP获得权重的变化量
         所有的结构都会在这个过程中利用
         args:
-            :x : [B,C,H,W] -- 突触前峰(若包含时间就将其降维到B中)
+            current : 通过卷积后的电流
+            :i_ASF : [B,C,H,W] -- 通过卷积和滤波器之后的电流(若包含时间就将其降维到B中)
         return:
             :s是脉冲 (B,C,H,W)
             :dw更新量 (out_planes,in_planes,H,W)
         """
-        x = x.clone().detach()  # 突触前的峰
-        i = self.conv(x)  # 输入电流(经过卷积后)
         with torch.no_grad():
-            thre_max = self.getthresh(i.detach())  # 自适应性阈值
-            i_ASF = self.ASFilter(i, thre_max)  # 通过适应阈值对电流进行滤波
             s = self.mem_update(i_ASF)  # 输出脉冲
-            if self.training:   # 是否训练
-                trace = self.cal_trace(x)  # 通过突触前峰更新trace
-                x.data += trace - x.data - self.offset  # x变为trace(求导得出的值)
+            # if self.training:   # 是否训练
+            #     trace = self.cal_trace(x)  # 通过突触前峰更新trace
+            #     x.data += trace - x.data - self.offset  # x变为trace(求导得出的值)
         if self.training:   # 是否训练
-            dw = torch.autograd.grad(outputs=i, inputs=self.conv.weight, grad_outputs=s)[0]
-            # print(x.size(0))
-            dw /= (i.size(0)*i.size(2)*i.size(3))  # 批次维度在求导时相加, （卷积核经过的相同位置，除去 ）
+            dw = torch.autograd.grad(outputs=i_ASF, inputs=self.conv.weight, grad_outputs=s, retain_graph=retain_graph)[0]
+            # print(dw.size(0))
         else:
             dw = 0.
         return s, dw
@@ -185,14 +197,23 @@ class STDPConv(nn.Module):
         current_ASF = thre / (1 + torch.exp(-(current - 4 * thre / 10) * (8 / thre)))
         return current_ASF
 
-    def normgrad(self):
+    def normgrad(self, force=True):
         """
         将STDP带来的权重变化量放入权重梯度中，然后使用优化器更新权重
         """
         if self.conv.weight.grad is None:
-            self.conv.weight.grad = -self.dw
+            self.conv.weight.grad = self.dw
         else:
-            self.conv.weight.grad.data = -self.dw
+            self.conv.weight.grad.data = self.dw
+        if force:
+            min = self.conv.weight.grad.data.min(1, True)[0].min(2, True)[0].min(3, True)[0]
+            max = self.conv.weight.grad.data.min(1, True)[0].max(2, True)[0].max(3, True)[0]
+            self.conv.weight.grad.data -= min
+            tmp = self.offset * max
+        else:
+            tmp = self.offset * self.spike.mean(0, True).mean(2, True).mean(3, True).permute(1, 0, 2, 3)
+        self.conv.weight.grad.data -= tmp
+        self.conv.weight.grad.data = -self.conv.weight.grad.data
 
     def normweight(self, clip=False):
         """
@@ -268,39 +289,47 @@ class STDPLinear(nn.Module):
         return:
            :spikes: 是脉冲 (B,C)
         """
-        current, spikes, dw = self.STDP(x)
-        self.getthresh(current.detach(), spikes.detach())  # 全连接在测试的时候似乎不用阈值平衡(需要调试)
-        if self.training:   # 是否训练
-            self.dw += dw       # /time_window
+        x = x.clone().detach()  # 突触前的峰
+        i = self.linear(x)  # 输入电流(经过卷积后)
+        self.current = i.detach()
 
+        spikes = 0
+        for T in range(time_window):
+            if T == time_window-1:
+                retain_graph = False
+            else:
+                retain_graph = True
+
+            s, dw = self.STDP(i, retain_graph=retain_graph)
+            if self.training:   # 是否训练
+                self.dw += dw       # /time_window
+            spikes += s
         return spikes
 
-    def STDP(self, x):
+    def STDP(self, i, retain_graph=True):
         """
         利用STDP获得权重的变化量
         所有的结构都会在这个过程中利用
         args:
-            :x : [B,C] -- 突触前峰(若包含时间就将其降维到B中)
+            :i : [B,C] -- 通过线性层后的电流(若包含时间就将其降维到B中)
         return:
             i 经过全连接后的电流
             :s是脉冲 (B,C)
             :dw更新量 (out_planes,in_planes)
         """
-        x = x.clone().detach()  # 突触前的峰
-        i = self.linear(x)  # 输入电流(经过卷积后)
         with torch.no_grad():
             s = self.mem_update(i)  # 输出脉冲
-            if self.training:  # 是否训练
-                trace = self.cal_trace(x)  # 通过突触前峰更新trace
-                x.data += trace - x.data - self.offset  # x变为trace(求导得出的值)
+            # if self.training:  # 是否训练
+            #     trace = self.cal_trace(x)  # 通过突触前峰更新trace
+            #     x.data += trace - x.data - self.offset  # x变为trace(求导得出的值)
         if self.training:  # 是否训练
-            dw = torch.autograd.grad(outputs=i, inputs=self.linear.weight, grad_outputs=s)[0]
+            dw = torch.autograd.grad(outputs=i, inputs=self.linear.weight, grad_outputs=s, retain_graph=retain_graph)[0]
             # print(x.size(0))
-            dw /= x.size(0)  # 批次维度在求导时相加，除去
+            # dw /= x.size(0)  # 批次维度在求导时相加，除去
             # print(self.dw)
         else:
             dw = 0.
-        return i, s, dw
+        return s, dw
 
     def cal_trace(self, x):
         """
@@ -334,7 +363,7 @@ class STDPLinear(nn.Module):
             self.lateralinh(x, xori)  # 抑制不放电神经元的膜电位大小
         return x
 
-    def getthresh(self, current, s_post, plus=plus):
+    def getthresh(self, s_post, plus=plus):
         """
         适应性阈值平衡(Adaptive threshold balance, ATB)
         全连接在测试的时候似乎不用阈值平衡
@@ -344,12 +373,12 @@ class STDPLinear(nn.Module):
         retuen:
             None
         """
-        self.lif.threshold.data += (plus * current * s_post).sum(0)
+        self.lif.threshold.data += (plus * self.current * s_post).sum(0)
         tmp = self.lif.threshold.max() - 350
         if tmp > 0:
             self.lif.threshold.data -= tmp
 
-    def normgrad(self):
+    def normgrad(self, force=True):
         """
         将STDP带来的权重变化量放入权重梯度中，然后使用优化器更新权重
         """
@@ -423,15 +452,15 @@ class MNISTnet(nn.Module):
     def __init__(self):
         super().__init__()
         self.net = nn.ModuleList([
-            STDPConv(in_planes=1, out_planes=channel, kernel_size=3,
-                     stride=1, padding=1, groups=1, decay=0.2,
+            STDPConv(in_planes=1, out_planes=channel, kernel_size=3,    # decay=0.2,
+                     stride=1, padding=1, groups=1,
                      decay_trace=0.99, offset=0.3, inh=1.625),
             STDPMaxPool(2, 2, 0),
+            Normliaze(),
             # STDPConv(12, 48, 3, 1, 1, 1, inh=inh2),
             # STDPMaxPool(2, 2, 0, static=True),
             # Normliaze(),
 
-            Normliaze(),
             STDPFlatten(start_dim=1),
             STDPLinear(196* channel, neuron, inh=inh, decay_trace=0.1, offset=0.0)   # 5--169, 3--196 , decay_trace=0.0, offset=0.0
         ])
@@ -494,7 +523,7 @@ if __name__ == "__main__":
 
     # 创建优化器
     # print(list(model.named_parameters())[conv_lin_params[0]:conv_lin_params[0] + 1])
-    optimizer_conv = torch.optim.SGD(list(model.parameters())[conv_lin_params[0]:conv_lin_params[0] + 1], lr=0.1)
+    optimizer_conv = torch.optim.SGD(list(model.parameters())[conv_lin_params[0]:conv_lin_params[0] + 1], lr=.1)
     # optimizer_conv = torch.optim.Adam(list(model.parameters())[conv_lin_params[0]:conv_lin_params[0] + 1], lr=0.1)
     lr = args.lr
     # print(list(model.named_parameters())[conv_lin_params[1]:conv_lin_params[1] + 1])
@@ -502,38 +531,34 @@ if __name__ == "__main__":
     # optimizer_lin = torch.optim.Adam(list(model.parameters())[conv_lin_params[1]:conv_lin_params[1] + 1], lr=lr)
     optimizer = [optimizer_conv, optimizer_lin]
 
-    time_window_conv = 200  # 时间窗口(文章中用的300)
+    time_window_conv = 100  # 时间窗口(文章中用的300)
     time_window_lin = 200
 
     # 创建编码器 2、泊松编码
     # encoder_conv = encoder(schemes=2, time_window=time_window_conv)
     # encoder_lin = encoder(schemes=2, time_window=time_window_lin)\
 
-    """
     # ================== 预训练(卷积层) ==================
     model.train()
     for layer in range(len(conv_lin_list) - 1):  # 遍历所有卷积层
         for epoch in range(3):
             for i, (images, labels) in enumerate(train_iter):
-                model.reset(conv_lin_list)  # 重置网络中的卷积层和全连接层
                 images = images.float().to(device)
                 labels = labels.to(device)
                 # images = encoder_conv(images)   # [..., t]
-                fireRate = 0
-                for t in range(time_window_conv):
-                    spikes = model(images, 0, conv_lin_list[layer], time_window_conv, train_layer=conv_lin_list[layer])
-                    fireRate += spikes
+                spikes = model(images, 0, conv_lin_list[layer], time_window_conv, train_layer=conv_lin_list[layer])
                 optimizer[layer].zero_grad()
                 model.normgrad(conv_lin_list[layer])
                 optimizer[layer].step()
                 model.normweight(conv_lin_list[layer], clip=False)
+                model.reset(conv_lin_list)  # 重置网络中的卷积层和全连接层
             print("layer", layer, "epoch", epoch, 'Done')
-    """
 
     best = 0
     for epoch in range(args.epoch):
-        # ================== 训练(卷积层) ==================
         model.train()
+        # ================== 训练(卷积层) ==================
+        """
         # 卷积层（一层，可能有两层）
         for layer in range(len(conv_lin_list) - 1):  # 遍历所有卷积层
             # for epoch in range(3):
@@ -551,6 +576,7 @@ if __name__ == "__main__":
                 optimizer[layer].step()
                 model.normweight(conv_lin_list[layer], clip=False)
                 # print("layer", layer, "epoch", epoch, 'Done')
+         """
 
         # ================== 训练(线性层) ==================
         # 线性层
@@ -560,27 +586,25 @@ if __name__ == "__main__":
         spikefull = None
         labelfull = None
         for i, (images, labels) in enumerate(train_iter):
-            model.reset(conv_lin_list)  # 重置网络中的卷积层和全连接层
             images = images.float().to(device)
             labels = labels.to(device)
             # images = encoder_lin(images)  # [..., t]
-            fireRate = 0
-            for t in range(time_window_lin):
-                spikes = model(images, 0, conv_lin_list[layer], time_window_lin, train_layer=conv_lin_list[layer])    # [B1,C]
-                fireRate += spikes
+            spikes = model(images, 0, conv_lin_list[layer], time_window_lin, train_layer=conv_lin_list[layer])    # [B1,C]
 
             # 拼接批次维
             if spikefull is None:
-                spikefull = fireRate
+                spikefull = spikes
                 labelfull = labels
             else:
-                spikefull = torch.cat([spikefull, fireRate], 0)  # (B,C)
+                spikefull = torch.cat([spikefull, spikes], 0)  # (B,C)
                 labelfull = torch.cat([labelfull, labels], 0)   #  (B,)
 
             optimizer[layer].zero_grad()
             model.normgrad(conv_lin_list[layer])
             optimizer[layer].step()
+            model.net[conv_lin_list[layer]].getthresh(spikes.detach())
             model.normweight(conv_lin_list[layer], clip=False)
+            model.reset(conv_lin_list)  # 重置网络中的卷积层和全连接层
 
         model.voting.assign_votes(spikefull, labelfull) # 投票
         result = model.voting(spikefull)
@@ -597,22 +621,20 @@ if __name__ == "__main__":
         labelfull = None
         layer = len(conv_lin_list) - 1  # 线性层的位置（就最后一层）
         for i, (images, labels) in enumerate(test_iter):# train_iter test_iter
-            model.reset(conv_lin_list)  # 重置网络中的卷积层和全连接层
             images = images.float().to(device)
             labels = labels.to(device)
             # images = encoder_lin(images)  # [..., t]
-            fireRate = 0
             with torch.no_grad():
-                for t in range(time_window_lin):
-                    spikes = model(images, 0, conv_lin_list[layer], time_window_lin)  # [B1,C]
-                    fireRate += spikes
+                spikes = model(images, 0, conv_lin_list[layer], time_window_lin)  # [B1,C]
                 # 拼接批次维
                 if spikefull is None:
-                    spikefull = fireRate
+                    spikefull = spikes
                     labelfull = labels
                 else:
-                    spikefull = torch.cat([spikefull, fireRate], 0)  # (B,C)
+                    spikefull = torch.cat([spikefull, spikes], 0)  # (B,C)
                     labelfull = torch.cat([labelfull, labels], 0)  # (B,)
+
+                model.reset(conv_lin_list)  # 重置网络中的卷积层和全连接层
 
         result = model.voting(spikefull)
         acc = (result == labelfull).float().mean()

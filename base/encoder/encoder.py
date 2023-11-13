@@ -94,7 +94,7 @@ def rate(x, time_window=5):
     x, _ = torch.broadcast_tensors(x,
                                    torch.zeros((time_window,) + x.shape, device=x.device))
     num_dims = len(shape)
-    dim_order = [num_dims - 1] + list(range(num_dims - 1))
+    dim_order = list(range(1, num_dims)) + [0]
     x = x.permute(*dim_order)
     # print(x)
     return (x > torch.rand(shape, device=x.device)).float()

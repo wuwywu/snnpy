@@ -14,8 +14,8 @@ import torchvision
 import torchvision.transforms as transforms
 
 # ===================================== cifat-10 ===================================== 
-def cifar10(train=True, batch_size=100, download=True, if_transforms=True, transforms_IN=None):
-    data_path = r".\cifar-10"
+def cifar10(train=True, batch_size=100, download=True,
+            data_path = r".\cifar-10", if_transforms=True, transforms_IN=None):
     classes = {'airplane': 0, 'automobile': 1, 'bird': 2, 'cat': 3, 'deer': 4, 'dog': 5, 'frog': 6, 'horse': 7, 'ship': 8, 'truck': 9}
     # =============== 训练集 ===============   
     if train:   
@@ -59,8 +59,8 @@ def cifar10(train=True, batch_size=100, download=True, if_transforms=True, trans
     
 
 # ===================================== MNIST ===================================== 
-def mnist(train=True, batch_size=100, download=True, if_transforms=True, transforms_IN=None):
-    data_path = r".\MNIST"
+def mnist(train=True, batch_size=100, download=True,
+          data_path = r".\MNIST", if_transforms=True, transforms_IN=None):
     MNIST_MEAN = 0.1307
     MNIST_STD = 0.3081
     classes = ["0 - zero", "1 - one", "2 - two", "3 - three", "4 - four", "5 - five", "6 - six", "7 - seven", "8 - eight", "9 - nine",
@@ -102,7 +102,8 @@ def mnist(train=True, batch_size=100, download=True, if_transforms=True, transfo
 
 
 # ===================================== fashion_MNIST ===================================== 
-def fashion_MNIST(train=True, batch_size=100, num_workers=8, if_transforms=True, transforms_IN=None):
+def fashion_MNIST(train=True, batch_size=100, data_path = r".\fashion_MNIST",
+                  num_workers=8, if_transforms=True, transforms_IN=None):
     """
     获取fashion MNIST数据
     http://arxiv.org/abs/1708.07747
@@ -113,7 +114,6 @@ def fashion_MNIST(train=True, batch_size=100, num_workers=8, if_transforms=True,
     :param transforms_IN: 自定义预处理
     :return: train_loader, test_loader
     """
-    data_path = r".\fashion_MNIST"
     classes = ["T-shirt/top", "Trouser", "Pullover", "Dress", "Coat", "Sandal", "Shirt", "Sneaker", "Bag", "Ankle boot"]
     if train:
         if transforms_IN is None:

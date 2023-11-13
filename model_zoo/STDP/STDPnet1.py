@@ -207,7 +207,7 @@ class STDPConv(nn.Module):
             self.conv.weight.grad.data = self.dw
         if force:
             min = self.conv.weight.grad.data.min(1, True)[0].min(2, True)[0].min(3, True)[0]
-            max = self.conv.weight.grad.data.min(1, True)[0].max(2, True)[0].max(3, True)[0]
+            max = self.conv.weight.grad.data.max(1, True)[0].max(2, True)[0].max(3, True)[0]
             self.conv.weight.grad.data -= min
             tmp = self.offset * max
         else:

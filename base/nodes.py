@@ -77,6 +77,36 @@ class BaseNode(nn.Module):
 # ============================================================================
 # 用于SNN的node
 
+class IFNode(BaseNode):
+    """
+        Ding 添加的第一个神经元模型
+        qianmingphy@ccnu
+    """
+    def __init__(self, threshold=.5, act_fun=SpikeAct):
+        super().__init__(threshold=threshold)
+        self.act_fun = act_fun(alpha=0.5, requires_grad=False)
+
+    def integral(self, inputs):
+        """
+            计算由当前inputs对于膜电势的累积
+            :param inputs: 当前突触输入电流
+            :type inputs: torch.tensor
+            :return: None
+        """
+        if self.mem is None:
+            self.mem = torch.zeros_like(inputs, device=inputs.device)
+            self.spike = torch.zeros_like(inputs, device=inputs.device)
+        self.mem += inputs # 在IF模型中，去掉衰减
+
+    def calc_spike(self):
+        """
+            通过当前的mem计算是否发放脉冲，并reset
+            :return: None
+        """
+        self.spike = self.act_fun(self.mem - self.threshold)
+        self.mem = self.mem * (1 - self.spike.detach())
+
+
 class LIFNode(BaseNode):
     def __init__(self, threshold=.5, decay=0.2, act_fun=SpikeAct):
         super().__init__(threshold=threshold, decay=decay)

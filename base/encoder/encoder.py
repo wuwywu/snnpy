@@ -100,7 +100,20 @@ def rate(x, time_window=5):
     return (x > torch.rand(shape, device=x.device)).float()
 
 
+@torch.no_grad()
+def Poisson(x, dt=0.1):
+    """
+    以 ms 为单位步进, 输入的值为刺激强度（泊松过程的平均放电率, HZ），
+    args:
+        x: 输入的图像值（放电强度，如255）
+        dt: 积分步长
+    reference: doi: 10.3389/fncom.2015.00099
+    """
+    return (torch.rand(x.shape, device=x.device)<x*dt/1000).float()
+
+
 if __name__ == "__main__":
     # encoder = encoder(3)
     # print(encoder(torch.tensor([.1, .2, .3])))
-    print(rate(torch.tensor([1, .5, .3])))
+    # print(rate(torch.tensor([1, .5, .3])))
+    print(Poisson(torch.tensor([1, 1000, .3]), dt=1))

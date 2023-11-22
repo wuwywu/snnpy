@@ -216,7 +216,7 @@ class LIFSTDP(BaseNode):
 class LIFei(BaseNode):
     """
     这个神经元可是兴奋神经元或抑制性神经元，接收到的突触，也可以是兴奋性输入或抑制性输入。
-    refence: doi: 10.3389/fncom.2015.00099
+    reference: doi: 10.3389/fncom.2015.00099
 
     math:
     $$\tau \frac { d V } { d t } = ( E _ { rest } - V )

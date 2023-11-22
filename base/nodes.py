@@ -22,7 +22,8 @@ class BaseNode(nn.Module):
         :params
         threshold: 神经元发放脉冲需要达到的阈值(神经元的参数)
         requires_thres_grad: 阈值求梯度
-        v_reset: 静息电位
+        v_reset: 重设电位
+        dt: 积分步长
         decay: 膜电位衰减项
         mem_detach: 是否将上一时刻的膜电位在计算图中截断
     """
@@ -30,13 +31,16 @@ class BaseNode(nn.Module):
                  threshold=.5,
                  requires_thres_grad=False,
                  v_reset=0.,
+                 dt=1.,
                  mem_detach=False,
                  decay=0.2,
                  ):
         super().__init__()
         self.mem = None
         self.spike = None
-        self.threshold = nn.Parameter(torch.tensor(threshold), requires_grad=requires_thres_grad)
+        self.threshold = nn.Parameter(torch.tensor(threshold),
+                                      requires_grad=requires_thres_grad)
+        self.dt = dt
         self.v_reset = v_reset
         self.decay = decay     # decay constants
         self.mem_detach = mem_detach
@@ -207,6 +211,80 @@ class LIFSTDP(BaseNode):
     def calc_spike(self):
         self.spike = self.act_fun(self.mem - self.threshold)  # SpikeActSTDP : approximation firing function, LIF的阈值 threshold
         self.mem = self.mem * (1 - self.spike.detach())
+
+
+class LIFei(BaseNode):
+    """
+    这个神经元可是兴奋神经元或抑制性神经元，接收到的突触，也可以是兴奋性输入或抑制性输入。
+    refence: doi: 10.3389/fncom.2015.00099
+
+    math:
+    $$\tau \frac { d V } { d t } = ( E _ { rest } - V )
+    + g _ { e } ( E _ { e c c } - V )
+    + g _ { i } ( E _ { i n h } - V )$$
+
+    args:
+        threshold: 神经元发放脉冲需要达到的阈值(神经元的参数)
+        v_reset: 重设电位
+        dt: 积分步长
+        mem_detach: 是否将上一时刻的膜电位在计算图中截断
+        Erest: 静息电位
+        tau: 膜电位时间常数, 用于控制膜电位衰减
+        refrac: 持续时间
+        mode_refrac: 选择不应期模式["hard", "soft"]
+        act_fun: 激活函数
+    """
+    def __init__(self, threshold=-52., v_reset=-65., dt=.5, mem_detach=True,
+                 Erest=-65, tau=100., refrac=5., mode_refrac="hard", act_fun=SpikeAct):
+        super().__init__(threshold=threshold, v_reset=v_reset, dt=dt, mem_detach=mem_detach)
+        self.Erest = Erest
+        self.tau = tau
+        self.refrac = refrac
+        self.mode_refrac = mode_refrac
+        self.act_fun = act_fun(alpha=0.5, requires_grad=False)
+        self.timer = None  # 记录放电后的间隔时间
+
+    def integral(self, inputs):
+        """
+        args:
+            inputs: 在外部将突触电流集合一起后输入
+        """
+        if self.mem is None:
+            self.mem = torch.zeros_like(inputs, device=inputs.device)+self.v_reset
+            self.spike = torch.zeros_like(inputs, device=inputs.device)
+            # 初始时没有不应期
+            if self.refrac > self.dt:
+                self.timer = torch.zeros_like(inputs, device=inputs.device)+self.refrac+1.
+        self.mem += (self.Erest-self.mem+inputs)/self.tau*self.dt
+
+    def calc_spike(self):
+        if self.refrac > self.dt:
+            self.spike = self.act_fun(self.mem - self.threshold)
+            if self.mode_refrac == "soft":
+                self.spike[self.timer<=self.refrac] = 0
+
+            self.mem = self.mem * (1 - self.spike.detach()) + self.v_reset * self.spike.detach()
+            if self.mode_refrac == "hard":
+                self.mem[self.timer<=self.refrac] = self.v_reset
+            if self.mode_refrac not in ["hard", "soft"]:
+                print("输入错误，不应期模式(mode_refrac): soft, hard, 运行结果不包含不应期")
+
+            # 更新记录时间
+            self.timer += self.dt
+            self.timer[self.spike>0] = 0
+        else:
+            # SpikeActSTDP : approximation firing function, LIF的阈值 threshold
+            self.spike = self.act_fun(self.mem - self.threshold)
+            self.mem = self.mem*(1 - self.spike.detach())+v_reset*self.spike.detach()
+
+    def n_reset(self):
+        """
+        神经元重置，用于模型接受两个不相关输入之间，重置神经元所有的状态
+        :return: None
+        """
+        self.mem = None
+        self.spike = None
+        self.timer = None  # 记录放电后的间隔时间
 
 
 if __name__ == "__main__":

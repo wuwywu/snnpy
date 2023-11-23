@@ -21,20 +21,13 @@ sys.path.append(r"../")
 sys.path.append(r"../../")
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torchvision.transforms as transforms
-import numpy as np
-import matplotlib.pyplot as plt
 import argparse
 
 from base.nodes import LIFSTDP
-from base.layers import addTLayer, FRLayer, VotingLayer, WTALayer, LateralInhibition
-from base.encoder.encoder import encoder
-from datasets.datasets import mnist, fashion_MNIST, cifar10
-from base.utils.utils import lr_scheduler, calc_correct_total, setup_seed
-from base_module import BaseModule
-
-from base.nodes import LIFbackEI
+from base.connection.layers import VotingLayer, WTALayer, LateralInhibition
+from datasets.datasets import mnist
+from base.utils.utils import setup_seed
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 

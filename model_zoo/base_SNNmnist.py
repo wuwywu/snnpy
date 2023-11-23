@@ -11,12 +11,9 @@ sys.path.append(os.path.dirname(__file__))  # 将文件所在地址放入系统�
 sys.path.append(r"../")
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import numpy as np
-import matplotlib.pyplot as plt
 
 from base.nodes import LIFNode
-from base.layers import addTLayer, FRLayer
+from base.connection.layers import addTLayer, FRLayer
 from base.encoder.encoder import encoder
 from datasets.datasets import mnist
 from base.utils.utils import lr_scheduler, toOneHot, calc_correct_total

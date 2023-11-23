@@ -26,6 +26,8 @@ import matplotlib.pyplot as plt
 import argparse
 
 from base.nodes import LIFei
+from base.connection.synapses import synchem
+from base.connection.layers import VotingLayer
 from base.utils.utils import setup_seed
 from base.encoder.encoder import Poisson
 from datasets.datasets import mnist
@@ -59,6 +61,14 @@ weight = {
     "ei": 10.4,
     'ie': 17.0
 }   # 三个突触权重的大小
+synapse = {
+    "tau_e": 1.,
+    "tau_i": 2.,
+    "E_ei": 0.,
+    "E_ie": -100.,
+    "E_ee": 0.,
+    "E_ii": -85.,
+}   # 突触的参数
 
 
 nInput = 784    # 输入节点数
@@ -95,42 +105,53 @@ class create_weight:
         return (torch.rand((nE, nInput)) + 0.01)*weight['ee_input']
 
 
-class Synapses_ei(nn.Module):
-    def __init__(self, pre, conn, post):
+class Synapses_stdp_ine(nn.Module):
+    """
+    这个模块从输入到兴奋性神经元，并且连接具有突触可塑性 input-->e
+    """
+    def __init__(self, conn, post, E=0, tau=1, dt=.1):
         super().__init__()
-        self.pre = pre
         self.conn = conn
         self.post = post
+        self.g = None  # 电导
+        self.E = E  # 平衡电位，兴奋突触/抑制突触
+        self.tau = tau  # 时间常数
+        self.dt = dt  # 积分步长
 
-    def forward(self, I):
+    def forward(self, x):
         """
+        输入图片泊松编码后的值，与兴奋性神经元连接，连接有stdp的作用
         args:
-            I: 输入进来的电流
+            x: 泊松编码后的 (1, 784)
         return:
-            突触前输入到突触后神经元的突触电流
+            I: 输出到突触后的突触电流值
         """
+        dg = self.conn(x)   # 电导的增量
+        if self.g is None:
+            self.g = torch.zeros_like(dg, device=dg.device)
+        I = self.g * (self.E - self.post.mem)
+        self.updata_g(dg)
+
+        return I
+
+    def updata_g(self, dg):
+        """
+        使用突触前计算出来的spike,更新电导
+        arg:
+            dg: 电导的更新
+        """
+        self.g += (dg-self.g)*self.dt/self.tau
+
+    def stdp(self):
         pass
 
-
-class Synapses_ie(nn.Module):
-    def __init__(self, pre, conn, post):
-        super().__init__()
-        self.pre = pre
-        self.conn = conn
-        self.post = post
-
-
-class Synapses_stdp_ine(nn.Module):
-    def __init__(self, conn, post):
-        super().__init__()
-        self.conn = conn
-        self.post = post
+    def n_reset(self):
+        self.g = None
 
 
 class MNISTnet(nn.Module):
     def __init__(self):
         super().__init__()
-        self.a = 1
         self.lif_e = LIFei(threshold=node_e["thresh"], v_reset=node_e["v_reset"], dt=dt,
                 Erest=node_e["Erest"], tau=node_e["tau"], refrac=node_e["refrac"])
         self.lif_i = LIFei(threshold=node_i["thresh"], v_reset=node_i["v_reset"], dt=dt,
@@ -138,17 +159,39 @@ class MNISTnet(nn.Module):
         self.fc_ine = nn.Linear(nInput, nE, bias=False)
         self.fc_ei = nn.Linear(nE, nI, bias=False)
         self.fc_ie = nn.Linear(nI, nE, bias=False)
-        self.init_weight()  #
+        self.init_weight()  # 初始化权重
+        self.create_syn()   # 创建突触
 
     def forward(self, x):
+        x = self.syn_ine(x)         # input-->e
+        x, spike_e = self.syn_ei(x) # e-->i 兴奋性突触
+        x, spike_i = self.syn_ie(x) # i-->e 抑制性突触
+        I, _ = self.syn_ei(x) # 兴奋神经元接受抑制性电流
 
-        pass
+        return spike_e1
 
     def init_weight(self):
         self.fc_ine.weight.data = create_weight.create_ine()
         self.fc_ei.weight.data = create_weight.create_ei()
         self.fc_ie.weight.data = create_weight.create_ie()
 
+    def create_syn(self):
+        self.syn_ei = synchem(pre=self.lif_e, conn=self.fc_ei, post=self.lif_i,
+                        E=synapse["E_ei"], tau=synapse["tau_e"], dt=dt)     # e-->i 兴奋性突触
+        self.syn_ie = synchem(pre=self.lif_i, conn=self.fc_ie, post=self.lif_e,
+                        E=synapse["E_ie"], tau=synapse["tau_i"], dt=dt)     # i-->e 抑制性突触
+        self.syn_ine = Synapses_stdp_ine(conn=self.fc_ine, post=self.lif_e,
+                        E=synapse["E_ee"], tau=synapse["tau_e"], dt=dt)     # input-->e 兴奋性突触
+
+    def getthresh(self):
+        pass
+
+    def n_reset(self):
+        self.lif_e.n_reset()
+        self.lif_i.n_reset()
+        self.syn_ei.n_reset()
+        self.syn_ie.n_reset()
+        self.syn_ine.n_reset()
 
 
 if __name__ == "__main__":
@@ -164,8 +207,8 @@ if __name__ == "__main__":
     # for i, (images, labels) in enumerate(train_iter):
     #     images = images*255/4   #0-63.75Hz
     #     for t in range(int(runTime/dt)):
-    #         x = Poisson(images, dt=dt)
-    #         print(x.sum())
+    #         x = Poisson(images, dt=dt).flatten(start_dim=1)
+    #         print(x.shape)
 
 
 

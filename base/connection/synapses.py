@@ -66,11 +66,17 @@ class synchem(BaseSynapses):
         self.tau = tau  # 时间常数
         self.dt = dt    # 积分步长
 
-    def forward(self, I):
-        s = self.spikepre(I)
+    def forward(self, x):
+        """
+        args:
+            x: 输入到突触前神经元的突触电流值
+        return:
+            I: 输出到突触后神经元的突触电流值
+        """
+        s = self.spikepre(x)
         dg = self.conn(s)   # 电导的增量
         if self.g is None:
-            self.g = torch.zeros_like(dg,  device=dg.device)
+            self.g = torch.zeros_like(dg, device=dg.device)
         I = self.g*(self.E-self.post.mem)
         self.updata_g(dg)
 

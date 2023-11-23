@@ -35,7 +35,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # 固定随机种子
 setup_seed(0)
 
-datasetPath = r"E:\snn_py\datasets\MNIST"
+datasetPath = r"E:\snnpy\datasets\MNIST"
 # 设置参数
 dt = .5                 # 积分步长
 runTime = 0.35*1000     # 350 ms

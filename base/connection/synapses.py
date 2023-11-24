@@ -77,7 +77,9 @@ class synchem(BaseSynapses):
         dg = self.conn(s)   # 电导的增量
         if self.g is None:
             self.g = torch.zeros_like(dg, device=dg.device)
-        I = self.g*(self.E-self.post.mem)
+            I = torch.zeros_like(dg, device=dg.device)
+        else:
+            I = self.g*(self.E-self.post.mem)
         self.updata_g(dg)
 
         return I, s

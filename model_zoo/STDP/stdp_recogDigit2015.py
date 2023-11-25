@@ -84,6 +84,16 @@ nInput = 784    # 输入节点数
 nE = 400        # 兴奋性神经元数
 nI = nE         # 抑制性神经元数
 
+def getargs():
+    parser = argparse.ArgumentParser(description="STDP框架研究2015年")
+
+    parser.add_argument('--batch', type=int, default=1, help='批次大小')
+
+    args = parser.parse_args()
+    return args
+
+args = getargs()
+
 class create_weight:
     """
     创建权重, ei权重，ie权重都是固定的
@@ -301,9 +311,9 @@ if __name__ == "__main__":
     # print(model.fc_ei.weight.data)
 
     transform = transforms.Compose([transforms.ToTensor()])
-    train_iter = mnist(train=True, batch_size=1, download=True,
+    train_iter = mnist(train=True, batch_size=args.batch, download=True,
                        data_path=datasetPath, transforms_IN=transform)  # transforms_IN=transform
-    test_iter = mnist(train=False, batch_size=10000, download=True,
+    test_iter = mnist(train=False, batch_size=args.batch, download=True,
                       data_path=datasetPath, transforms_IN=transform)
     #
     input_intensity = 2

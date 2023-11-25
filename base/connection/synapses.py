@@ -21,7 +21,7 @@ class BaseSynapses(nn.Module):
     """
     这是一个突触的基类, 输入前一个神经元传递过来的突触电流，
     通过突触前神经元pre, 连接conn, 以及突触后神经元post的膜电位
-    计算突触前神经元pre个突触后神经元post的突触电流
+    计算突触前神经元pre给突触后神经元post的突触电流
     args:
         pre: 突触前神经元
         conn: 连接

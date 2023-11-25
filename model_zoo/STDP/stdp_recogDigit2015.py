@@ -281,7 +281,7 @@ class MNISTnet(nn.Module):
             spike_e: 兴奋性神经元放电
         """
         self.theta += -self.theta/1e7*dt
-        self.theta += 0.05*spike_e
+        self.theta += (0.05*spike_e).sum(0)
         self.lif_e.threshold.data = node_e["thresh"]-node_e["offset"]+self.theta
 
     def updateweight(self):
@@ -313,7 +313,7 @@ if __name__ == "__main__":
     transform = transforms.Compose([transforms.ToTensor()])
     train_iter = mnist(train=True, batch_size=args.batch, download=True,
                        data_path=datasetPath, transforms_IN=transform)  # transforms_IN=transform
-    test_iter = mnist(train=False, batch_size=args.batch, download=True,
+    test_iter = mnist(train=False, batch_size=10000, download=True,
                       data_path=datasetPath, transforms_IN=transform)
     #
     input_intensity = 2

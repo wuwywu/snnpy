@@ -270,8 +270,8 @@ class LIFei(BaseNode):
                 print("输入错误，不应期模式(mode_refrac): soft, hard, 运行结果不包含不应期")
 
             # 更新记录时间
-            self.timer += self.dt
             self.timer[self.spike>0] = 0
+            self.timer += self.dt
         else:
             # SpikeActSTDP : approximation firing function, LIF的阈值 threshold
             self.spike = self.act_fun(self.mem - self.threshold)
@@ -285,6 +285,84 @@ class LIFei(BaseNode):
         self.mem = None
         self.spike = None
         self.timer = None  # 记录放电后的间隔时间
+
+
+class HHnode(BaseNode):
+    """
+    Hodgkin–Huxley (HH)模型
+    reference: https://doi.org/10.1113/jphysiol.1952.sp004764
+    I = Cm dV/dt + g_k*n^4*(V_m-V_k) + g_Na*m^3*h*(V_m-V_Na) + g_l*(V_m - V_L)
+    args:
+        threshold: 放电阈值
+        dt: 积分步长
+        T: 环境温度
+    """
+    def __init__(self, threshold=20., dt=.01, T=6.3):
+        super().__init__(threshold=threshold, dt=dt)
+        self.phi = 3**((T-6.3)/10)  # 温度因子
+        self.g_Na = 120
+        self.g_K = 36
+        self.g_l = .3
+        self.V_Na = 50.
+        self.V_K = -77.
+        self.V_l = -54.4
+        self.C = 1.
+        self.mem_p = None
+        self.m = None
+        self.n = None
+        self.h = None
+
+    def integral(self, inputs):
+        """
+        计算由当前inputs对于膜电势的累积
+        :param inputs: 当前突触输入电流
+        :type inputs: torch.tensor
+        :return: None
+        """
+        if self.mem is None:
+            self.mem = -70.68*torch.ones_like(inputs, device=inputs.device)
+            self.mem_p = self.mem.clone()
+            self.spike = torch.zeros_like(inputs, device=inputs.device)
+            self.m = 0.05*torch.ones_like(inputs, device=inputs.device)
+            self.n = 0.31*torch.ones_like(inputs, device=inputs.device)
+            self.h = 0.59*torch.ones_like(inputs, device=inputs.device)
+
+        alpha_n = (0.01 * self.mem + .55) / (1 - torch.exp(-5.5 - 0.1 * self.mem))
+        beta_n = 0.125 * torch.exp((-self.mem - 65) / 80.0)
+        alpha_m = (4 + 0.1 * self.mem) / (1 - torch.exp(-4. - 0.1 * self.mem))
+        beta_m = 4.0 * torch.exp((-self.mem - 65) / 18.0)
+        alpha_h = 0.07 * torch.exp((-self.mem-65) / 20.0)
+        beta_h = 1 / (1 + torch.exp(-3.5 - 0.1 * self.mem))
+
+        self.n += self.dt*(alpha_n * (1 - self.n) - beta_n * self.n)*self.phi
+        self.m += self.dt*(alpha_m * (1 - self.m) - beta_m * self.m)*self.phi
+        self.h += self.dt*(alpha_h * (1 - self.h) - beta_h * self.h)*self.phi
+
+        I_Na = torch.pow(self.m, 3) * self.g_Na * self.h * (self.mem - self.V_Na)
+        I_K = torch.pow(self.n, 4) * self.g_K * (self.mem - self.V_K)
+        I_L = self.g_l * (self.mem - self.V_l)
+
+        self.mem_p = self.mem.clone()
+        self.mem +=  self.dt * (inputs - I_Na - I_K - I_L) / self.C
+
+    def calc_spike(self):
+        """
+        通过当前的mem计算是否发放脉冲
+        :return: None
+        """
+        self.spike = (self.threshold > self.mem_p).float() * (self.mem > self.threshold).float()
+
+    def n_reset(self):
+        """
+        神经元重置，重置神经元所有的状态
+        :return: None
+        """
+        self.mem = None
+        self.mem_p = None
+        self.spike = None
+        self.m = None
+        self.n = None
+        self.h = None
 
 
 if __name__ == "__main__":

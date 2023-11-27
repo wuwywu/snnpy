@@ -111,8 +111,10 @@ if __name__ == "__main__":
                  
     data_path = r".\MNIST"
     # 数据集
-    train_loader = mnist(train=True, batch_size=batch_size, download=True, if_transforms=True)
-    test_loader = mnist(train=False, batch_size=batch_size, download=True, if_transforms=True)
+    train_loader = mnist(train=True, batch_size=batch_size, download=True,
+          data_path = data_path, if_transforms=True)
+    test_loader = mnist(train=False, batch_size=batch_size, download=True,
+          data_path = data_path, if_transforms=True)
     # 模型
     snn = MNISTNet() # 创建模型
     snn.to(device)

@@ -3,7 +3,7 @@
 # Datetime  : 2023/11/20
 # User      : WuY
 # File      : stdp_recogDigit2015.py
-# paper     : Yiting Dong, Unsupervised learning of digit recognition using spike-timing-dependent plasticity
+# paper     : Peter U. Diehl, Unsupervised learning of digit recognition using spike-timing-dependent plasticity
 # doi       : 10.3389/fncom.2015.00099
 # 描述       : 这篇文章比较经典，很多的好文章都引用了这篇
 """

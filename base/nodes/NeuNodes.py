@@ -2,7 +2,7 @@
 # Author    : WuY<wuyong@mails.ccnu.edu.com>
 # Datetime  : 2023/10/21
 # User      : WuY
-# File      : nodes.py
+# File      : NeuNodes.py
 # 将各种用于神经网络的`节点`集合到这里
 
 import os

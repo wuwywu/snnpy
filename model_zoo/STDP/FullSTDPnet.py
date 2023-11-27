@@ -24,7 +24,7 @@ import torch.nn as nn
 import torchvision.transforms as transforms
 import argparse
 
-from base.nodes.nodes import LIFSTDP
+from base.nodes.NeuNodes import LIFSTDP
 from base.connection.layers import VotingLayer, WTALayer, LateralInhibition
 from datasets.datasets import mnist
 from base.utils.utils import setup_seed

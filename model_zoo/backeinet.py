@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import argparse
 
-from base.nodes.nodes import LIFbackEI
+from base.nodes.NeuNodes import LIFbackEI
 from base.connection.layers import addTLayer, FRLayer
 from base.encoder.encoder import encoder
 from datasets.datasets import mnist, fashion_MNIST, cifar10

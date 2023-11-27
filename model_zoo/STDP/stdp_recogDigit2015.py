@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt
 import argparse
 from tqdm import tqdm
 
-from base.nodes.nodes import LIFei
+from base.nodes.NeuNodes import LIFei
 from base.connection.synapses import synchem
 from base.connection.layers import VotingLayer
 from base.utils.utils import setup_seed

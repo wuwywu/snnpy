@@ -12,7 +12,7 @@ sys.path.append(r"../")
 import torch
 import torch.nn as nn
 
-from base.nodes.nodes import LIFNode
+from base.nodes.NeuNodes import LIFNode
 from base.connection.layers import addTLayer, FRLayer
 from base.encoder.encoder import encoder
 from datasets.datasets import mnist

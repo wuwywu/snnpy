@@ -63,7 +63,7 @@ class encoder(nn.Module):
     @torch.no_grad()
     def Rate_Syn(self, x):
         x_ = torch.zeros(x.shape + (self.time_window,), device=x.device)
-        t = ((1 - x) * self.time_window).int()
+        t = ((1 - x) * self.time_window).round()
         for step in range(self.time_window):
             x_step = torch.where(step >= t, 1., 0.)
             x_[..., step] = x_step
@@ -72,7 +72,7 @@ class encoder(nn.Module):
     @torch.no_grad()
     def TTFS(self, x):
         x_ = torch.zeros(x.shape + (self.time_window,), device=x.device)
-        t = ((1 - x) * self.time_window).int()
+        t = ((1 - x) * self.time_window).round()
         for step in range(self.time_window):
             x_step = torch.where(step == t, 1., 0.)
             x_[..., step] = x_step

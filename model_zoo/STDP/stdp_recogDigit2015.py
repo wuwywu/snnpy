@@ -20,6 +20,7 @@ sys.path.append(r"../../")
 import torch
 import torch.nn as nn
 import torchvision.transforms as transforms
+import torchvision
 import numpy as np
 import matplotlib.pyplot as plt
 import argparse
@@ -309,12 +310,17 @@ if __name__ == "__main__":
     model = MNISTnet().to(device)
     # print(model.fc_ei.weight.data)
 
+    # 一张张训练若使用transforms会造成速度大幅度下降
     transform = transforms.Compose([transforms.ToTensor()])
-    train_iter = mnist(train=True, batch_size=args.batch, download=True,
+    train_iter1 = mnist(train=True, batch_size=60000, download=True,
                        data_path=datasetPath, transforms_IN=transform)  # transforms_IN=transform
     test_iter = mnist(train=False, batch_size=10000, download=True,
-                      data_path=datasetPath, transforms_IN=transform)
-    #
+                      data_path=datasetPath, transforms_IN=transform)  # 测试时可以一次性测试
+
+    train_iter = [i for i in train_iter1][0]
+    train_im = (train_iter[0]*255./8).to(device)
+    train_label = train_iter[1].to(device)
+
     input_intensity = 2
     start_input_intensity = input_intensity
     update_interval = 1000 # 更新投票层的频率
@@ -324,16 +330,18 @@ if __name__ == "__main__":
         spikefull = None
         labelfull = None
         model.train()
-        for i, (images_train, labels) in enumerate(tqdm(train_iter)):
+        # for i, (images_train, labels) in enumerate(tqdm(train_iter)):
+        for i in tqdm(range(60000)):
             current_spike_count = 0
             while current_spike_count<5:
                 model.n_reset()
-                images = images_train*255*input_intensity/8   #0-63.75Hz
-                labels = labels.to(device)
+                # images = images_train*255*input_intensity/8   #0-63.75Hz
+                images = train_im[i]*input_intensity    #0-63.75Hz
+                labels = train_label[i:i+1]
                 spike_e = 0
                 # model.n_reset()
                 for t in range(int(runTime/dt)):    #
-                    x = Poisson(images, dt=dt).flatten(start_dim=1).to(device)
+                    x = Poisson(images, dt=dt).flatten(start_dim=1) # .to(device)
                     spike_e += model(x)
 
                 current_spike_count = spike_e.sum()
@@ -377,7 +385,6 @@ if __name__ == "__main__":
                 plt.title(f"epoch={epoch}, i={i}")
                 plt.colorbar()
                 plt.pause(0.0000000000000000001)
-
 
         # ================== 测试 ==================
         model.eval()

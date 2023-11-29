@@ -42,6 +42,10 @@ class BaseSynapses(nn.Module):
         return self.pre(I)
 
     def n_reset(self):
+        """
+        突触电导重置，用于模型接受两个不相关输入之间，重置神经元所有的状态
+        :return: None
+        """
         self.g = None
 
 
@@ -91,4 +95,12 @@ class synchem(BaseSynapses):
             dg: 电导的更新
         """
         self.g += (dg-self.g)*self.dt/self.tau
+
+    def i_reset(self):
+        """
+        输入的维度一致
+        在需要频繁重置时,开辟内存的消耗太大
+        """
+        if self.g is not None:
+            self.g.fill_(0)
 

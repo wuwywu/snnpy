@@ -164,9 +164,20 @@ class Synapses_stdp_ine(nn.Module):
         """
         self.g += (dg-self.g)*self.dt/self.tau
 
-
     def n_reset(self):
+        """
+        突触电导重置，用于模型接受两个不相关输入之间，重置神经元所有的状态
+        :return: None
+        """
         self.g = None
+
+    def i_reset(self):
+        """
+        输入的维度一致
+        在需要频繁重置时,开辟内存的消耗太大
+        """
+        if self.g is not None:
+            self.g.fill_(0)
 
 
 class MNISTnet(nn.Module):
@@ -304,6 +315,19 @@ class MNISTnet(nn.Module):
         self.trace_post2 = None  # 突触后的trace2
         self.dw = 0
 
+    def i_reset(self):
+        self.lif_e.i_reset()
+        self.lif_i.i_reset()
+        self.syn_ei.i_reset()
+        self.syn_ie.i_reset()
+        self.syn_ine.i_reset()
+        self.Iie = 0
+        self.trace_pre = None   # 突触前的trace
+        if self.trace_post1 is not None:
+            self.trace_post1.fill_(0)  # 突触后的trace1
+            self.trace_post2.fill_(0)  # 突触后的trace2
+        self.dw = 0
+
 
 
 if __name__ == "__main__":
@@ -321,7 +345,7 @@ if __name__ == "__main__":
     train_im = (train_iter[0]*255./8).to(device)
     train_label = train_iter[1].to(device)
 
-    input_intensity = 2
+    input_intensity = 3
     start_input_intensity = input_intensity
     update_interval = 1000 # 更新投票层的频率
     plt.ion()
@@ -334,7 +358,7 @@ if __name__ == "__main__":
         for i in tqdm(range(60000)):
             current_spike_count = 0
             while current_spike_count<5:
-                model.n_reset()
+                model.i_reset() # 重置元素值
                 # images = images_train*255*input_intensity/8   #0-63.75Hz
                 images = train_im[i]*input_intensity    #0-63.75Hz
                 labels = train_label[i:i+1]
@@ -371,7 +395,7 @@ if __name__ == "__main__":
                 labelfull = None
 
             # 动态权重可视化
-            if i % 100 == 0 and i > 0:
+            if i % 500 == 0 and i > 0:
                 weight = model.fc_ine.weight.data.cpu().numpy()
                 weight1 = weight[0].reshape(28,28)
                 weight2 = weight[200].reshape(28, 28)
@@ -392,7 +416,7 @@ if __name__ == "__main__":
         spikefull = None
         labelfull = None
         for i, (images_test, labels) in enumerate(tqdm(test_iter)):  # train_iter test_iter
-            model.n_reset()
+            model.n_reset() # 重置维度值
             images = images_test * 255 * input_intensity / 8  # 0-63.75Hz
             labels = labels.to(device)
             spike_e = 0

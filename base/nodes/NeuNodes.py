@@ -287,6 +287,18 @@ class LIFei(BaseNode):
         self.spike = None
         self.timer = None  # 记录放电后的间隔时间
 
+    def i_reset(self):
+        """
+        输入的维度一致
+        在需要频繁重置时,开辟内存的消耗太大
+        :return: None
+        """
+        if self.mem is not None:
+            self.mem.fill_(self.v_reset)
+            self.spike.fill_(0)
+            if self.refrac > self.dt:
+                self.timer.fill_(0)  # 记录放电后的间隔时间
+
 
 class HHnode(BaseNode):
     """

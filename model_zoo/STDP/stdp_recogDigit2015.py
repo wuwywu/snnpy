@@ -355,6 +355,7 @@ if __name__ == "__main__":
         labelfull = None
         model.train()
         # for i, (images_train, labels) in enumerate(tqdm(train_iter)):
+        model.n_reset()  # 重置维度值
         for i in tqdm(range(60000)):
             current_spike_count = 0
             while current_spike_count<5:

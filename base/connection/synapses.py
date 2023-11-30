@@ -43,6 +43,7 @@ class BaseSynapses(nn.Module):
 
     def n_reset(self):
         """
+        重置维度
         突触电导重置，用于模型接受两个不相关输入之间，重置神经元所有的状态
         :return: None
         """

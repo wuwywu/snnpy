@@ -72,6 +72,7 @@ class BaseNode(nn.Module):
     
     def n_reset(self):
         """
+        重置维度
         神经元重置，用于模型接受两个不相关输入之间，重置神经元所有的状态
         :return: None
         """
@@ -280,6 +281,7 @@ class LIFei(BaseNode):
 
     def n_reset(self):
         """
+        重置维度
         神经元重置，用于模型接受两个不相关输入之间，重置神经元所有的状态
         :return: None
         """
@@ -367,6 +369,7 @@ class HHnode(BaseNode):
 
     def n_reset(self):
         """
+        重置维度
         神经元重置，重置神经元所有的状态
         :return: None
         """

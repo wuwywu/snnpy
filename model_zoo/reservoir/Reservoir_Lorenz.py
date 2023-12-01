@@ -8,7 +8,7 @@
 import os
 import sys
 sys.path.append(os.path.dirname(__file__))  # 将文件所在地址放入系统调用地址中\
-sys.path.append(r"../")
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import random
 import torch
@@ -101,6 +101,7 @@ if __name__ == "__main__":
     reservoir_size = 500
     output_size = 1
     model = ESN(input_size, reservoir_size, output_size)
+    print(model(torch.rand(10,1)))
 
 
 

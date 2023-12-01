@@ -16,7 +16,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
-from base.utils.utils import setup_seed
+from utils import setup_seed
 
 # 全局禁用梯度计算
 torch.set_grad_enabled(False)

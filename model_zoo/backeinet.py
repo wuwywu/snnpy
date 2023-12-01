@@ -10,8 +10,7 @@ from base.nodes.NeuNodes import LIFbackEI
 from base.connection.layers import addTLayer, FRLayer
 from base.encoder.encoder import encoder
 from datasets.datasets import mnist, fashion_MNIST, cifar10
-from base.utils.utils_snn import lr_scheduler, toOneHot, calc_correct_total
-from base.utils.utils import setup_seed
+from base.utils.utils import lr_scheduler, toOneHot, calc_correct_total, setup_seed
 from base_module import BaseModule
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")

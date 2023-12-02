@@ -68,6 +68,70 @@ class RLS(nn.Module):
         self.P = torch.stack([self.alpha * torch.eye(self.num) for i in self.local])
 
 
+class RLS_numpy:
+    """
+    最初的numpy版本
+    """
+    def __init__(self, N=1, local=[1, 2]):
+        self.params()
+        self.num = N        # 神经元的数量
+        self.local = local  # 神学习经元的位置
+        # Initialization of P matrix
+        self.P = np.array([1 / self.alpha * np.eye(N) for i in local])
+
+    def params(self):
+        self.alpha = 1  # Inverse of learning rate parameter
+
+    def forward(self, w, input, error):
+        # 假设 input 的形状是 (len(self.local), N)
+        input = input[self.local]
+        # 假设 error 的形状是 (len(self.local),)
+        # error = error[self.local]
+
+        # 执行矩阵-向量乘法
+        Prs = np.einsum('ijk,ik->ij', self.P, input)  # 形状为 (len(self.local), N)
+
+        # 计算 a 的向量化版本
+        as_ = 1.0 / (1.0 + np.einsum('ij,ij->i', input, Prs))  # 形状为 (len(self.local),)
+
+        # 更新 Ps
+        P_updates = np.einsum('i,ij,ik->ijk', as_, Prs, Prs)
+        self.P -= P_updates
+
+        # 更新权重 w
+        w[self.local] -= np.einsum('i,ij->ij', as_ * error, Prs)
+
+    def reset(self):
+        self.P = np.array([1 / self.alpha * np.eye(self.num) for i in self.local])
+
+
+class RLS_base:
+    def __init__(self, N=1, local=[1, 2]):
+        self.params()
+        self.num = N  # 神经元的数量
+        self.local = local  # 神学习经元的位置
+        # Initialization of P matrix
+        self.P = [1 / self.alpha * np.eye(N) for i in local]
+
+    def params(self):
+        self.alpha = 1  # Inverse of learning rate parameter
+
+    # Recursive least squares algorithm
+    def forward(self, w, input, error):
+        # Changes non-local variables in-place
+        for i, N in enumerate(self.local):
+            # Update P
+            Pr = self.P[i] @ input[N]
+            a = 1 / (1 + np.dot(input[N], Pr))
+            self.P[i] -= np.outer(Pr, Pr) * a
+
+            # Update weights
+            w[N] -= (a * Pr) * error[i]
+
+    def reset(self):
+        self.P = [1 / self.alpha * np.eye(self.num) for i in self.local]
+
+
 if __name__ == "__main__":
     rls = RLS(N=10, local=[0])
     w = torch.randn(3, 10)     # 假设 w 是一个 (10, 2) 形状的张量 (output, input)

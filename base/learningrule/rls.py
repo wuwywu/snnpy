@@ -75,7 +75,7 @@ class RLS_numpy:
     def __init__(self, N=1, local=[1, 2]):
         self.params()
         self.num = N        # 神经元的数量
-        self.local = local  # 神学习经元的位置
+        self.local = local  # 神经元学习的位置
         # Initialization of P matrix
         self.P = np.array([1 / self.alpha * np.eye(N) for i in local])
 
@@ -109,7 +109,7 @@ class RLS_base:
     def __init__(self, N=1, local=[1, 2]):
         self.params()
         self.num = N  # 神经元的数量
-        self.local = local  # 神学习经元的位置
+        self.local = local  # 神经元学习的位置
         # Initialization of P matrix
         self.P = [1 / self.alpha * np.eye(N) for i in local]
 

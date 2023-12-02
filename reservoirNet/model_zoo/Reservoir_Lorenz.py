@@ -87,7 +87,8 @@ class ESN(nn.Module):
 
 
 # Lorenz Chaotic System
-
+def lorenz_system():
+    pass
 
 
 # 训练方法（岭回归）

@@ -17,8 +17,53 @@ import numpy as np
 import matplotlib.pyplot as plt
 import argparse
 
-
 class RLS(nn.Module):
+    def __init__(self, in_num=1, out_num=1, alpha=1.0):
+        """
+        Recursive least squares algorithm
+        args:
+            N: 输入节点个数
+            alpha: 学习率
+        """
+        super(RLS, self).__init__()
+        self.in_num = in_num            # 输入的数量
+        self.out_num = out_num          # 学习的输出节点位置
+        self.alpha = alpha              # 学习率
+        # (out_num, in_num, in_num)
+        self.P = torch.stack([self.alpha * torch.eye(in_num) for i in range(out_num)])
+
+    def forward(self, w, input, error):
+        """
+        使用rls更新权重
+        N: input_num: 输入节点的数量
+        args:
+            w: 需要更新的权重，shape: (output, N)
+            input: 输入值，shape: (in_num, )
+            error: 输出值与对比值的误差, shape: (out_num, )
+        """
+        # 执行矩阵-向量乘法
+        Prs = torch.einsum('ijk,k->ij', self.P, input)  # 形状为 (out_num, in_num)
+
+        # 计算 a 的向量化版本
+        as_ = 1.0 / (1.0 + torch.einsum('j,ij->i', input, Prs))  # 形状为 (out_num,)
+
+        # 更新 Ps
+        P_updates = torch.einsum('i,ij,ik->ijk', as_, Prs, Prs)
+        self.P -= P_updates
+
+        # 更新权重 w
+        w_updates = torch.einsum('i,ij->ij', as_ * error, Prs)
+        w -= w_updates
+
+    def n_reset(self):
+        """
+        重置递归参数
+        """
+        self.P = torch.stack([self.alpha * torch.eye(self.in_num) for i in range(out_num)])
+
+
+# dynamic learning of synchronization (DLS) algorithm
+class RLS_complex(nn.Module):
     def __init__(self, N=1, local=[0,], alpha=1.0):
         """
         Recursive least squares algorithm
@@ -133,10 +178,12 @@ class RLS_base:
 
 
 if __name__ == "__main__":
-    rls = RLS(N=10, local=[0])
-    w = torch.randn(3, 10)     # 假设 w 是一个 (10, 2) 形状的张量 (output, input)
+    in_num = 10
+    out_num = 1
+    rls = RLS(in_num=in_num, out_num=out_num)
+    w = torch.randn(out_num, in_num)     # 假设 w 是一个 (10, 2) 形状的张量 (output, input)
     print(w)
-    input = torch.randn(3, 10) # 输入 (output, input)
-    error = torch.randn(3)
+    input = torch.randn(in_num,) # 输入 (input, )
+    error = torch.randn(out_num,) # 输入 (ouput, )
     rls(w, input, error)
     print(w)

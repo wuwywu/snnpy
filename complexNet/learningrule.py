@@ -16,4 +16,4 @@ import torch.nn.functional as F
 import numpy as np
 import matplotlib.pyplot as plt
 
-from base.learningrule import RLS_complex as DLS   # # dynamic learning of synchronization (DLS) algorithm
+from base.learningrule.rls import RLS_complex as DLS   # # dynamic learning of synchronization (DLS) algorithm

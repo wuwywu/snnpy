@@ -17,6 +17,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # online
-from base.learningrule import rls   # FORCE(Recursive least squares algorithm)
-from base.learningrule import ridge # # 岭回归算法--> ridge regression
+from base.learningrule.rls import RLS       # FORCE(Recursive least squares algorithm)
+from base.learningrule.ridge import Ridge   # # 岭回归算法--> ridge regression
 

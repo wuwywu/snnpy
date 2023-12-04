@@ -1,9 +1,9 @@
 # encoding: utf-8
 # Author    : WuY<wuyong@mails.ccnu.edu.com>
-# Datetime  : 2023/12/1
+# Datetime  : 2023/12/4
 # User      : WuY
 # File      : learningrule.py
-# 用于reservoir的算法集合到这里
+# 用于复杂网络的算法集合到这里
 
 import os
 import sys
@@ -16,7 +16,4 @@ import torch.nn.functional as F
 import numpy as np
 import matplotlib.pyplot as plt
 
-# online
-from base.learningrule import rls   # FORCE(Recursive least squares algorithm)
-from base.learningrule import ridge # # 岭回归算法--> ridge regression
-
+from base.learningrule import RLS_complex as DLS   # # dynamic learning of synchronization (DLS) algorithm

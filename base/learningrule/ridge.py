@@ -35,7 +35,7 @@ def Ridge(X, Y, alpha=1e-6):
     X_transpose = torch.transpose(X, 0, 1)
 
     # 计算权重的闭式解
-    W = torch.inverse(X_transpose @ X + alpha * I) @ X_transpose @ Y
+    W = torch.pinverse(X_transpose @ X + alpha * I) @ X_transpose @ Y
     return W.transpose(0, 1)  # 调整为 (n_outputs, n_features)
 
 

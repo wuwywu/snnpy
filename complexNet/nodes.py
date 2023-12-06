@@ -19,3 +19,4 @@ import matplotlib.pyplot as plt
 from base.nodes.NeuNodes import BaseNode
 from base.nodes.NeuNodes import HHnode
 from base.nodes.NeuNodes import IzhNode
+from base.nodes.NeuNodes import FHNode

@@ -79,6 +79,16 @@ class BaseNode(nn.Module):
         self.mem = None
         self.spike = None
 
+    def i_reset(self):
+        """
+        输入的维度一致
+        在需要频繁重置时,开辟内存的消耗太大
+        :return: None
+        """
+        if self.mem is not None:
+            self.mem.fill_(self.v_reset)
+            self.spike.fill_(0)
+
         
 # ============================================================================
 # 用于SNN的node

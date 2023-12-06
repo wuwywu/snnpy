@@ -391,6 +391,106 @@ class HHnode(BaseNode):
         self.h = None
 
 
+class IzhNode(BaseNode):
+    """
+    Izhikevich 脉冲神经元
+    reference： E.M. Izhikevich, Simple model of spiking neurons, IEEE Transactions on neural networks, 14(6), 1569-1572 (2003).
+    v' = 0.04v^2 + 5v + 140 -u + I
+    u' = a(bv-u)
+    下面是将Izh离散化的写法
+    if v>= thresh:
+        v = c
+        u = u + d
+
+    args:
+        threshold: 神经元发放脉冲需要达到的阈值
+        dt: 时间步长
+        act_fun: 使用surrogate gradient 对梯度进行近似, 默认为 ``SpikeAct``
+    """
+    def __init__(self, threshold=30., dt=.01, act_fun=SpikeAct):
+        super().__init__(threshold=threshold, dt=dt)
+        self.a = 0.02
+        self.b = 0.2
+        self.c = -65.
+        self.d = 2.
+        self.act_fun = act_fun(alpha=0.5, requires_grad=False)
+        # 初始化膜电位 以及 对应的U
+        self.mem = None
+        self.u = None
+        self.spike = None
+
+    def integral(self, inputs):
+        if self.mem is None:
+            self.mem = torch.zeros_like(inputs, device=inputs.device)
+            self.spike = torch.zeros_like(inputs, device=inputs.device)
+            self.u = torch.zeros_like(inputs, device=inputs.device)
+
+        self.mem = self.mem + self.dt * (0.04 * self.mem * self.mem + 5 * self.mem - self.u + 140 + inputs)
+        self.u = self.u + self.dt * (self.a * self.b * self.mem - self.a * self.u)
+
+    def calc_spike(self):
+        self.spike = self.act_fun(self.mem - self.threshold)  # 大于阈值释放脉冲
+        self.mem = self.mem * (1 - self.spike.detach()) + self.spike.detach() * self.c
+        self.u = self.u + self.spike.detach() * self.d
+
+    def n_reset(self):
+        self.mem = None
+        self.u = None
+        self.spike = None
+
+    def i_reset(self):
+        """
+        输入的维度一致
+        在需要频繁重置时,开辟内存的消耗太大
+        :return: None
+        """
+        if self.mem is not None:
+            self.mem.fill_(0.)
+            self.u.fill_(0.)
+            self.spike.fill_(0.)
+
+
+class FHNode(BaseNode):
+    def __init__(self, threshold=1., dt=.01):
+        super().__init__(threshold=threshold, dt=dt)
+        self.epsi = .08
+        self.a = .7
+        self.b = .8
+
+        self.mem = None
+        self.mem_p = None
+        self.y = None
+        self.spike = None
+
+    def integral(self, inputs):
+        if self.mem is None:
+            self.mem = torch.zeros_like(inputs, device=inputs.device)
+            self.mem_p = torch.zeros_like(inputs, device=inputs.device)
+            self.y = torch.zeros_like(inputs, device=inputs.device)
+            self.spike = torch.zeros_like(inputs, device=inputs.device)
+
+        self.mem_p = self.mem.clone()
+        self.mem += (self.mem - self.mem ** 3 / 3 - self.y + inputs)*self.dt
+        self.y += (self.epsi * (self.mem_p+ self.a - self.b * self.y))*self.dt
+
+    def calc_spike(self):
+        self.spike = (self.threshold > self.mem_p).float() * (self.mem > self.threshold).float()
+
+    def n_reset(self):
+        self.mem = None
+        self.mem_p = None
+        self.y = None
+        self.spike = None
+
+    def i_reset(self):
+        if self.mem is not None:
+            self.mem.fill_(0.)
+            self.mem_p.fill_(0.)
+            self.y.fill_(0.)
+            self.spike.fill_(0.)
+
+
+
 if __name__ == "__main__":
     snn = LIFSTDP()
     # snn = LIFbackEI()

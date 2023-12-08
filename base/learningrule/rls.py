@@ -72,9 +72,9 @@ class RLS_complex(nn.Module):
             local: 学习的输出节点位置，是一个列表或者数组
             alpha: 学习率
         """
-        super(RLS, self).__init__()
+        super().__init__()
         self.num = N                        # 输入的数量
-        self.local = torch.tensor(local)    # 学习的输出节点位置
+        self.local = local                  # 学习的输出节点位置
         self.alpha = alpha                  # 学习率
         self.P = torch.stack([self.alpha * torch.eye(N) for i in local])
 

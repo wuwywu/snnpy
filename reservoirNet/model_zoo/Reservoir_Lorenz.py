@@ -151,7 +151,7 @@ if __name__ == "__main__":
 
     Ttrian = 30_000
     Ttest = 5_0000
-    train_data = lorenz[num_discard:Ttrian]
+    train_data = lorenz[num_discard+1:Ttrian+1]
 
     hs = []
     model.i_reset()

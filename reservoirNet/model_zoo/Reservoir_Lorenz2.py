@@ -89,8 +89,8 @@ class ESN(nn.Module):
 
     def train_readout(self, x):
         h = self.reseroir(x)
-        return h
-        # return torch.cat([x, h])
+        # return h
+        return torch.cat([x, h])
 
     def reseroir(self, input):
         """
@@ -133,4 +133,69 @@ class ESN(nn.Module):
         """
         self.h.fill_(0.)
 
+
+if __name__ == "__main__":
+    # 准备数据集
+    initial_state = torch.tensor([1.0, 1.0, 1.0])
+    num_steps = 5_0000  # 时间步数
+    lorenz = simulate_lorenz(initial_state, num_steps, dt=0.01)
+    lorenz_data = torch.cat((torch.ones((lorenz.size(0), 1)), lorenz), dim=1)
+
+    input_size = 3
+    reservoir_size = 300
+    # output_size = 3
+    model = ESN(input_size, reservoir_size, spectral_radius=0.9, alpha=0.3)
+
+    # 输出池网络中的值，准备训练网络
+    num_discard = 200
+
+    num_discard = 200
+    Ttrian = 3_000
+    Ttest = 7_000
+    train_data = lorenz[num_discard+1:Ttrian+1]
+
+    hs = []
+    model.i_reset()
+    for t in range(Ttrian):
+        h_ = model.train_readout(lorenz_data[t])
+        if t >= num_discard:
+            hs.append(h_.clone())
+    hs = torch.stack(hs)
+
+    # 训练输出权重(readout)
+    model.readout.weight.data = Ridge(hs, train_data, alpha=1e-6)
+
+    # 测试
+    output_test = []
+    o = lorenz[Ttrian]
+    for t in np.arange(Ttrian, Ttest):
+        o[1] = lorenz[t, 1]
+        # print(o.shape)
+        o = torch.cat((torch.ones(1), o))
+        o = model(o)
+        output_test.append(o.clone())
+
+    output_test = torch.stack(output_test)
+
+    plt.figure(figsize=(12, 12))
+    plt.subplot(311)
+    ind = 0
+    plt.plot(output_test[0:2000, ind], label='predict')
+    plt.plot(lorenz[Ttrian:Ttrian + 2000, ind], label='predict')
+    plt.subplot(312)
+    ind = 1
+    plt.plot(output_test[0:2000, ind], label='predict')
+    plt.plot(lorenz[Ttrian:Ttrian + 2000, ind], label='predict')
+    plt.subplot(313)
+    ind = 2
+    plt.plot(output_test[0:2000, ind], label='predict')
+    plt.plot(lorenz[Ttrian:Ttrian + 2000, ind], label='predict')
+    plt.legend()
+
+    plt.figure()
+    plt.plot(output_test[:, 0], output_test[:, 1], label='predict')
+    plt.plot(lorenz[:, 0], lorenz[:, 1], label='real')
+    plt.legend()
+
+    plt.show()
 

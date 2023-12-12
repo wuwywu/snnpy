@@ -29,6 +29,9 @@ setup_seed(0)
 
 # Lorenz Chaotic System
 def lorenz_system(state, sigma, rho, beta):
+    """
+    reference: E. N. Lorenz, Deterministic nonperiodic fow, J. Atmos. Sci. 20, 130-141 (1963).
+    """
     x, y, z = state[..., 0], state[..., 1], state[..., 2]
     dx_dt = sigma * (y - x)
     dy_dt = x * (rho - z) - y

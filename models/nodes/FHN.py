@@ -2,7 +2,7 @@
 # Author    : WuY<wuyong@mails.ccnu.edu.com>
 # Datetime  : 2024/2/24
 # User      : WuY
-# File      : HH.py
+# File      : FHN.py
 # FitzHugh-Nagumo(FHN) 模型
 
 from base import Neurons

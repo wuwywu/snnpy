@@ -16,6 +16,8 @@ class Neurons:
     method ： 计算非线性微分方程的方法，（"eluer", "rk4"）
     dt ： 计算步长
     神经元的膜电位都写为：mem
+    运行时间：t; 时间步长：dt
+    神经元数量：num
     """
     def __init__(self, N, method="eluer", dt=0.01):
         self.num = N  # 神经元数量

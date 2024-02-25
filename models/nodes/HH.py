@@ -3,7 +3,7 @@
 # Datetime  : 2024/2/24
 # User      : WuY
 # File      : HH.py
-# Hodgkin-Huxley(HH)模型
+# Hodgkin-Huxley(HH) 模型
 
 from base import Neurons
 import os
@@ -12,9 +12,15 @@ import copy
 import numpy as np
 import matplotlib.pyplot as plt
 
+seed = 0
+np.random.seed(seed)                # 给numpy设置随机种子
+
 class HH(Neurons):
     """
     N : 建立神经元的数量
+    method ： 计算非线性微分方程的方法，（"eluer", "rk4"）
+    dt ： 计算步长
+    神经元的膜电位都写为：mem
     """
     def __init__(self, N=1, method="eluer", dt=0.01):
         super().__init__(N, method=method, dt=dt)
@@ -33,8 +39,8 @@ class HH(Neurons):
         self._Cm = 1.0  # 比膜电容(uF/cm2)
         self.Iex = 10   # 恒定的外部激励
         # self._q10 = 1
-        # self.th_up = 0  # 放电阈值
-        # self.th_dowm = -10  # 放电阈下值
+        self.th_up = 0  # 放电阈值
+        self.th_dowm = -10  # 放电阈下值
         # 电磁
         # self.a1 = 0.4
         # self.b1 = 0.02

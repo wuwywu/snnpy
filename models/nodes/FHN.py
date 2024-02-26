@@ -8,9 +8,12 @@
 from base import Neurons
 import os
 import sys
+sys.path.append(os.path.dirname(__file__))  # 将文件所在地址放入系统调用地址中
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import copy
 import numpy as np
 import matplotlib.pyplot as plt
+from utils.utils import spikevent
 
 seed = 0
 np.random.seed(seed)                # 给numpy设置随机种子
@@ -56,18 +59,23 @@ class FHN(Neurons):
 
 
 if __name__ == "__main__":
-    N = 10
+    N = 2
     method = "eluer"  # "rk4", "eluer"
     models = FHN(N=N, method=method)
 
     time = []
     mem = []
+    se = spikevent(N)
 
     for i in range(10000):
         models()
         time.append(models.t)
-        mem.append(models.mem[0])
+        mem.append(models.mem.copy())
+        se(models.t, models.flaglaunch)
 
     plt.plot(time, mem)
+    plt.figure()
+    se.pltspikes()
+    # print(se.Tspike_list)
 
     plt.show()

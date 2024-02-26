@@ -5,8 +5,8 @@
 device = "cpu"
 # from settings import *
 import numpy
-import cupy
 if device == "gpu":
+    import cupy
     np1 = numpy
     np = cupy
 else:   

@@ -5,8 +5,8 @@
 device = "cpu"
 # from settings import *
 import numpy
+import cupy
 if device == "gpu":
-    import cupy
     np1 = numpy
     np = cupy
 else:   
@@ -16,6 +16,12 @@ import matplotlib.pyplot as plt
 
 # noise产生器
 class noise_types:
+    """
+    产生噪声
+    size: 要产生噪声的尺度，可以是整数或元组
+    delta_t: 计算步长，与算法一致
+    type: 噪声类型，白噪声，色噪声 ["white", "color"]
+    """
     def __init__(self, size, delta_t, type="white"):
         self.size = size
         self.dt = delta_t
@@ -23,6 +29,10 @@ class noise_types:
         if type == "color" : self.color_init = False
 
     def __call__(self, D_noise=0., lam_color=0.1):
+        """
+        D_noise: 噪声强度
+        lam_color: 相关率
+        """
         if self.type=="white":   noise = np.random.normal(loc=0., scale=np.sqrt(2*D_noise*self.dt), size=self.size)  
         if self.type=="color": 
             if self.color_init is False : 
@@ -40,6 +50,11 @@ class noise_types:
 
 # 计算同步因子
 class cal_synFactor:
+    """
+    计算变量的同步因子
+    Tn: 计算次数(int)，Time/dt
+    num: 需要计算变量的数量
+    """
     def __init__(self, Tn, num):
         self.Tn = Tn    # 计算次数
         self.n = num    # 矩阵大小
@@ -47,11 +62,11 @@ class cal_synFactor:
         # 初始化计算过程
         self.up1 = 0
         self.up2 = 0
-        self.down1 = torch.zeros(num)
-        self.down2 = torch.zeros(num)
+        self.down1 = np.zeros(num)
+        self.down2 = np.zeros(num)
 
     def __call__(self, x):
-        F = torch.mean(x)
+        F = np.mean(x)
         self.up1 += F*F/self.Tn
         self.up2 += F/self.Tn
         self.down1 += x*x/self.Tn
@@ -61,7 +76,7 @@ class cal_synFactor:
     def return_syn(self):
         if self.count != self.Tn:
             print(f"输入计算次数{self.Tn},实际计算次数{self.count}") 
-        down = torch.mean(self.down1-self.down2**2)
+        down = np.mean(self.down1-self.down2**2)
         if down>-0.000001 and down<0.000001:
             return 1.
         up = self.up1-self.up2**2
@@ -74,6 +89,11 @@ class cal_synFactor:
 
 # 延迟存储器
 class delayer:
+    """
+    存储参数的延迟值
+    num: 需要存储的延迟量
+    Tn: 延迟时长 delay/dt
+    """
     def __init__(self, num, Tn):
         self.n = num                          # 延迟变量数量
         self.delayLong = Tn                   # 延迟时长    

@@ -29,7 +29,7 @@ class Neurons:
 
     def _fparams(self):
         self.th_up = 0  # 放电阈值
-        self.th_dowm = -10  # 放电阈下值
+        self.th_down = -10  # 放电阈下值
 
     def _fvars(self):
         self.t = 0  # 运行时间
@@ -97,6 +97,6 @@ class Neurons:
         self.flaglaunch[firing_StartPlace] = 1  # 放电开启标志
         self.firingTime[firing_StartPlace] = self.t  # 记录放电时间
         #  -------------------- 放电结束 -------------------
-        firing_endPlace = np.where((mem < self.th_dowm) & (self.flag == 1))  # 放电结束的位置
+        firing_endPlace = np.where((mem < self.th_down) & (self.flag == 1))  # 放电结束的位置
         self.flag[firing_endPlace] = 0  # 放电标志改为放电
 

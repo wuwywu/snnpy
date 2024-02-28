@@ -5,7 +5,6 @@
 # File      : ML.py
 # Morris–Lecar(ML) 模型
 
-from base import Neurons
 import os
 import sys
 sys.path.append(os.path.dirname(__file__))  # 将文件所在地址放入系统调用地址中
@@ -13,6 +12,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import copy
 import numpy as np
 import matplotlib.pyplot as plt
+from base import Neurons
 from utils.utils import spikevent
 
 seed = 0
@@ -50,7 +50,7 @@ class ML(Neurons):
 
         self.Iex = 100  # 恒定的外部激励
         self.th_up = 10.  # 放电阈值
-        self.th_dowm = 10.  # 停止放电阈值
+        self.th_down = 10.  # 停止放电阈值
 
     def _vars(self):
         # Model variables

@@ -5,7 +5,6 @@
 # File      : HH.py
 # Hodgkin-Huxley(HH) 模型
 
-from base import Neurons
 import os
 import sys
 sys.path.append(os.path.dirname(__file__))  # 将文件所在地址放入系统调用地址中
@@ -13,6 +12,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import copy
 import numpy as np
 import matplotlib.pyplot as plt
+from base import Neurons
 from utils.utils import spikevent
 
 seed = 0
@@ -43,7 +43,7 @@ class HH(Neurons):
         self.Iex = 10   # 恒定的外部激励
         # self._q10 = 1
         self.th_up = 0  # 放电阈值
-        self.th_dowm = -10  # 放电阈下值
+        self.th_down = -10  # 放电阈下值
         # 电磁
         # self.a1 = 0.4
         # self.b1 = 0.02

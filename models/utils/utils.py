@@ -5,8 +5,8 @@
 device = "cpu"
 # from settings import *
 import numpy
-import cupy
 if device == "gpu":
+    import cupy
     np1 = numpy
     np = cupy
 else:   
@@ -46,45 +46,6 @@ class noise_types:
             noise = self.noise
 
         return noise
-    
-
-# 计算同步因子
-class cal_synFactor:
-    """
-    计算变量的同步因子
-    Tn: 计算次数(int)，Time/dt
-    num: 需要计算变量的数量
-    """
-    def __init__(self, Tn, num):
-        self.Tn = Tn    # 计算次数
-        self.n = num    # 矩阵大小
-        self.count = 0  # 统计计算次数
-        # 初始化计算过程
-        self.up1 = 0
-        self.up2 = 0
-        self.down1 = np.zeros(num)
-        self.down2 = np.zeros(num)
-
-    def __call__(self, x):
-        F = np.mean(x)
-        self.up1 += F*F/self.Tn
-        self.up2 += F/self.Tn
-        self.down1 += x*x/self.Tn
-        self.down2 += x/self.Tn
-        self.count += 1     # 计算次数叠加
-
-    def return_syn(self):
-        if self.count != self.Tn:
-            print(f"输入计算次数{self.Tn},实际计算次数{self.count}") 
-        down = np.mean(self.down1-self.down2**2)
-        if down>-0.000001 and down<0.000001:
-            return 1.
-        up = self.up1-self.up2**2
-
-        return up/down
-    
-    def reset(self):
-        self.__init__(self.Tn, self.n)
 
 
 # 延迟存储器

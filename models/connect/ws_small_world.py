@@ -2,7 +2,7 @@
 # Author    : WuY<wuyong@mails.ccnu.edu.com>
 # Datetime  : 2024/2/29
 # User      : WuY
-# File      : small-world.py
+# File      : ws_small-world.py
 # 小世界网络模型
 
 import os

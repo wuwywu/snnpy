@@ -15,8 +15,8 @@ import matplotlib.pyplot as plt
 from base import Neurons
 from utils.utils import spikevent
 
-seed = 0
-np.random.seed(seed)                # 给numpy设置随机种子
+# seed = 0
+# np.random.seed(seed)                # 给numpy设置随机种子
 
 class FHN(Neurons):
     """

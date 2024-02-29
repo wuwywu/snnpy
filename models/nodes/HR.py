@@ -58,8 +58,8 @@ class HR(Neurons):
         dz_dt = self.r*(self.s * (self.mem - self.xR) - self.z)
         return dx_dt, dy_dt, dz_dt
 
-    def __call__(self):
-        I = self.Iex  # External stimulus
+    def __call__(self, Io=0):
+        I = self.Iex+Io  # External stimulus
         # Update the variables using the chosen numerical method
         self.method(self._hr, I, self.mem, self.y, self.z)
         # Evaluation of spikes

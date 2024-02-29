@@ -50,8 +50,8 @@ class FHN(Neurons):
         dy_dt = self.a * (self.mem + self.c - self.b * self.y)
         return dmem_dt, dy_dt
 
-    def __call__(self):
-        I = self.Iex        # 恒定的外部激励
+    def __call__(self, Io=0):
+        I = self.Iex+Io        # 恒定的外部激励
         self.method(self._fhn, I, self.mem, self.y)  #
         self._spikes_eval(self.mem)  # 放电测算
 

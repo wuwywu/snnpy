@@ -80,8 +80,8 @@ class HH(Neurons):
 
         return dmem_dt, dm_dt, dn_dt, dh_dt
 
-    def __call__(self):
-        I = self.Iex        # 恒定的外部激励
+    def __call__(self, Io=0):
+        I = self.Iex+Io        # 恒定的外部激励
         self.method(self._HH, I, self.mem, self.m, self.n, self.h)  #
         self._spikes_eval(self.mem)  # 放电测算
 

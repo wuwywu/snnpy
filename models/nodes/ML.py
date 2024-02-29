@@ -69,8 +69,8 @@ class ML(Neurons):
 
         return dmem_dt, dW_dt
 
-    def __call__(self):
-        I = self.Iex  # External current
+    def __call__(self, Io=0):
+        I = self.Iex+Io  # External current
         # Update the variables using the chosen numerical method
         self.method(self._ml, I, self.mem, self.W)
         # Evaluation of spikes

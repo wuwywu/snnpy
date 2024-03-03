@@ -19,9 +19,9 @@ class Neurons:
     运行时间：t; 时间步长：dt
     神经元数量：num
     """
-    def __init__(self, N, method="eluer", dt=0.01):
+    def __init__(self, N, method="euler", dt=0.01):
         self.num = N  # 神经元数量
-        if method == "eluer":   self.method = self._eluer
+        if method == "euler":   self.method = self._euler
         if method == "rk4":   self.method = self._rk4
         self.dt = dt
         self._fparams()
@@ -38,7 +38,7 @@ class Neurons:
         self.flaglaunch = np.zeros(self.num, dtype=int)     # 模型开始放电标志
         self.firingTime = np.zeros(self.num)                # 记录放电时间
 
-    def _eluer(self, models, I, *args):
+    def _euler(self, models, I, *args):
         """
         使用 euler 算法计算非线性微分方程
         arg:

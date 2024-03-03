@@ -21,7 +21,7 @@ from utils.utils import spikevent
 class ML(Neurons):
     """
     N : 建立神经元的数量
-    method ： 计算非线性微分方程的方法，（"eluer", "rk4"）
+    method ： 计算非线性微分方程的方法，（"euler", "rk4"）
     dt ： 计算步长
     神经元的膜电位都写为：mem
     """
@@ -81,7 +81,7 @@ class ML(Neurons):
 
 if __name__ == "__main__":
     N = 2
-    method = "eluer"  # "rk4", "eluer"
+    method = "euler"  # "rk4", "euler"
     models = ML(N=N, method=method, dt=0.01)
     # models.Iex = 3.
     time = []

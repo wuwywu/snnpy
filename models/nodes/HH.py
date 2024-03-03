@@ -21,11 +21,11 @@ from utils.utils import spikevent
 class HH(Neurons):
     """
     N : 建立神经元的数量
-    method ： 计算非线性微分方程的方法，（"eluer", "rk4"）
+    method ： 计算非线性微分方程的方法，（"euler", "rk4"）
     dt ： 计算步长
     神经元的膜电位都写为：mem
     """
-    def __init__(self, N=1, method="eluer", dt=0.01):
+    def __init__(self, N=1, method="euler", dt=0.01):
         super().__init__(N, method=method, dt=dt)
         # self.num = N  # 神经元数量
         self._params()
@@ -90,7 +90,7 @@ class HH(Neurons):
 
 if __name__ == "__main__":
     N = 2
-    method = "eluer" # "rk4", "eluer"
+    method = "euler" # "rk4", "euler"
     models = HH(N=N, method=method)
 
     time = []

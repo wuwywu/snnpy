@@ -23,11 +23,16 @@ class HH(Neurons):
     N : 建立神经元的数量
     method ： 计算非线性微分方程的方法，（"euler", "rk4"）
     dt ： 计算步长
+    temperature: 温度(℃)
     神经元的膜电位都写为：mem
     """
-    def __init__(self, N=1, method="euler", dt=0.01):
+    def __init__(self, N=1, method="euler", dt=0.01, temperature=None):
         super().__init__(N, method=method, dt=dt)
         # self.num = N  # 神经元数量
+        # 温度因子
+        self.temperature = temperature      # 标准温度(℃) 实验温度为6.3
+        if temperature is not None:
+            self.phi = 3.0 ** ((temperature - 6.3) / 10)  # 温度系数
         self._params()
         self._vars()
 
@@ -44,6 +49,7 @@ class HH(Neurons):
         # self._q10 = 1
         self.th_up = 0  # 放电阈值
         self.th_down = -10  # 放电阈下值
+
         # 电磁
         # self.a1 = 0.4
         # self.b1 = 0.02
@@ -77,6 +83,10 @@ class HH(Neurons):
                 - 0.125 * np.exp(-(self.mem + 65.0) / 80) * self.n
         dh_dt = 0.07 * np.exp(-(self.mem + 65.0) / 20.0) * (1.0 - self.h) \
                 - 1.0 / (1.0 + np.exp(-(self.mem + 35.0) / 10.0)) * self.h
+        if self.temperature is not None:
+            dm_dt *= self.phi
+            dn_dt *= self.phi
+            dh_dt *= self.phi
 
         return dmem_dt, dm_dt, dn_dt, dh_dt
 
@@ -91,7 +101,7 @@ class HH(Neurons):
 if __name__ == "__main__":
     N = 2
     method = "euler" # "rk4", "euler"
-    models = HH(N=N, method=method)
+    models = HH(N=N, method=method, temperature=6.3)
 
     time = []
     mem = []

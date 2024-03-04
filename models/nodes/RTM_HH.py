@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 from base import Neurons
 from utils.utils import spikevent
 
-class HH(Neurons):
+class RTM_HH(Neurons):
     """
     N : 建立神经元的数量
     method ： 计算非线性微分方程的方法，（"euler", "rk4"）
@@ -79,8 +79,8 @@ class HH(Neurons):
 
 if __name__ == "__main__":
     N = 2
-    method = "eluer"     # "rk4", "eluer"
-    models = HH(N=N, method=method)
+    method = "euler"     # "rk4", "euler"
+    models = RTM_HH(N=N, method=method)
     models.Iex = 0.75
 
     t_final = 100

@@ -6,6 +6,8 @@
 # Reduced Traub-Miles Hodgkin-Huxley(HH) 模型
 # Description: 这是对 Ermentrout 和 Kopell 提出的模型的轻微修改,
 # 又是 Traub 和 Miles 提出的大鼠海马锥体兴奋细胞模型的简化
+# https://doi.org/10.1073/pnas.95.3.1259
+# https://doi.org/10.1017/CBO9780511895401
 
 import os
 import sys

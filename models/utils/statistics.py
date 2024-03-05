@@ -129,3 +129,76 @@ class cal_cv:
         cv_mean = cv.mean()
 
         return cv, cv_mean
+
+
+# Kuramoto Order parameter
+class cal_kop:
+    """
+    通过记录放电开始的时间以及放电神经元的序号
+    计算 Kuramoto Order parameter
+    dt: 计算的时间步长
+    """
+    def __init__(self, dt=0.01):
+        self.dt = dt
+        self.pltPlace = []      # neuron label
+        self.pltTime = []       # time spike
+
+    def __call__(self, flaglaunch, t):
+        """
+        flaglaunch: 放电开始标志
+        t: 运行时间
+        """
+        flag = flaglaunch.astype(int)
+        firingPlace = list(np.where(flag > 0)[0])  # 放电的位置
+        lens = len(firingPlace)  # 放电位置的数量
+        self.pltPlace.extend(firingPlace)  # 记录放电位置
+        self.pltTime.extend([t] * lens)  # 记录放电时间
+
+    def return_kop(self):
+        spkt = np.array(self.pltTime.copy())
+        spkid = np.array(self.pltPlace.copy())
+        dt = self.dt
+        # 1、设置一个阈值，一个神经元必须要超过这个分的数量才计算
+        thrs_spks = 10
+        unique_neurons, counts = np.unique(spkid, return_counts=True)
+        filt_neurons = unique_neurons[counts > thrs_spks]  # 过滤后的神经元
+
+        if filt_neurons.shape[0] != unique_neurons.shape[0]:
+            print("存在神经元峰的计数不足{}".format(thrs_spks))
+
+        # 2、找到第一个峰和最后一个峰的时间，并计算最大的首峰和最小的尾峰时间段
+        first_spikes = []
+        last_spikes = []
+        for idx in filt_neurons:
+            first_spikes.append(spkt[np.where(spkid == idx)[0][0]])
+            last_spikes.append(spkt[np.where(spkid == idx)[0][-1]])
+
+        first_last_spk = np.max(first_spikes)  # define the start of interval
+        last_first_spk = np.min(last_spikes)  # define the end of interval
+
+        # 3、计算每个神经元的相位
+        ttotal = spkt[-1] - spkt[0]
+        time_vec = np.linspace(spkt[0], spkt[-1], int(ttotal / dt))
+
+        phase = np.ones((len(filt_neurons), len(time_vec))) * -1
+
+        for z, neuron_label in enumerate(filt_neurons):
+            idx_individual_spikes = np.where(spkid == neuron_label)[0]  # 神经元放电的位置
+            individual_spkt = spkt[idx_individual_spikes]   # 神经元放电的时间
+            for i, t in enumerate(individual_spkt[:-1]):
+                ti = np.where(time_vec >= t)[0][0]  # t_n
+                tf = np.where(time_vec >= individual_spkt[i + 1])[0][0] # t_n+1
+                phase[z][ti:tf] = np.linspace(0, 2. * np.pi, (tf - ti))
+
+        # 剪切出定义的相位的区间
+        idxs = np.where((time_vec > first_last_spk) & (time_vec < last_first_spk))[0]
+        phase = phase[:, idxs]
+
+        # 计算 Kuramoto Order parameter
+        kuramoto = np.abs(np.mean(np.exp(1j * phase), axis=0))
+
+        # 若需要则以输出以下量
+        # 1、随时间变化的 Kuramoto Order parameter 存在 kuramoto
+        # 2、每个神经元的相位变化存在 phase
+        # 3、计算的时间为 first_last_spk -- last_first_spk
+        return np.mean(kuramoto), kuramoto, phase

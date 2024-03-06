@@ -202,3 +202,89 @@ class cal_kop:
         # 2、每个神经元的相位变化存在 phase
         # 3、计算的时间为 first_last_spk -- last_first_spk
         return np.mean(kuramoto), kuramoto, phase, (first_last_spk, last_first_spk)
+
+
+# 计算尖峰序列的信息熵 entropy 和两个序列的互信息 mutual information
+class cal_information:
+    """
+    用于计算尖峰序列的信息熵 entropy 和两个序列的互信息 mutual information
+    time_s: 计算开始的时间
+    time_e: 计算结束的时间
+    bin_size: bin，一个时间窗口，在这个窗口中计算峰的个数 (ms), 非常重要的参数需要调节选取
+    """
+    def __init__(self, time_s, time_e, bin_size=15):
+        self.time_s = time_s
+        self.time_e = time_e
+        self.num_bins = int(np.ceil((time_e-time_s) / bin_size))    # 将总时间段分为格子数
+        self.pltPlace = []  # neuron label
+        self.pltTime = []  # time spike
+
+    def __call__(self, flaglaunch, t):
+        """
+        flaglaunch: 放电开始标志(用于记录峰)
+        t: 运行时间
+        """
+        flag = flaglaunch.astype(int)
+        firingPlace = list(np.where(flag > 0)[0])  # 放电的位置
+        lens = len(firingPlace)  # 放电位置的数量
+        self.pltPlace.extend(firingPlace)  # 记录放电位置
+        self.pltTime.extend([t] * lens)  # 记录放电时间
+
+    def return_info(self):
+        spkt = np.array(self.pltTime.copy())
+        spkid = np.array(self.pltPlace.copy())
+        unique_neurons = np.unique(spkid)
+        spike_count_list = []   # 保存每个神经元的尖峰计数
+        entropy = []            # 保存每个神经元的信息熵
+        for idx in unique_neurons:
+            spike_times = spkt[np.where(spkid == idx)[0]]
+            spike_count, _ = np.histogram(spike_times, bins=self.num_bins, range=(self.time_s, self.time_e))
+            spike_count_list.append(spike_count)
+
+            entropy.append(self._entropy(spike_count))
+
+        # 计算所有的互信息
+        MI = np.zeros((len(unique_neurons), len(unique_neurons)))
+        for i, idx in enumerate(unique_neurons):
+            for j, idy in enumerate(unique_neurons):
+                MI[i, j] = self._mutual_information(spike_count_list[i], spike_count_list[j])
+
+        return entropy, MI
+
+    def _entropy(self, spike_counts):
+        """
+        计算信息熵
+        spike_counts: 一个尖峰序列计数的数组
+        return:
+            entropy: 尖峰序列的信息熵信息熵
+        """
+        # 计算概率分布
+        values, counts = np.unique(spike_counts, return_counts=True)
+        probabilities = counts / sum(counts)
+        # 计算信息熵
+        entropy = -np.sum(probabilities * np.log2(probabilities + 1e-12))
+
+        return entropy
+
+    def _mutual_information(self, spike_counts1, spike_counts2):
+        """
+        计算两组尖峰序列的互信息
+        spike_counts1: 第一组序列的尖峰计数
+        spike_counts2: 第二组序列的尖峰计数
+        return:
+            MI: 互信息 (mutual information)
+        """
+        # 计算联合概率分布
+        joint_hist, _, _ = np.histogram2d(spike_counts1, spike_counts2, bins=self.num_bins)
+        p_xy = joint_hist / np.sum(joint_hist)  # 联合概率分布
+        p_x = np.sum(p_xy, axis=1, keepdims=True)  # 边缘概率分布，保持维度用于后续广播操作
+        p_y = np.sum(p_xy, axis=0, keepdims=True)  # 边缘概率分布，保持维度用于后续广播操作
+
+        # 使用矩阵运算计算互信息
+        with np.errstate(divide='ignore', invalid='ignore'):
+            MI_matrix = p_xy * np.log2(p_xy / (p_x @ p_y) + 1e-12)  # @符号用于矩阵乘法
+            MI_matrix[np.isnan(MI_matrix)] = 0  # 处理NaN值
+            MI = np.sum(MI_matrix)
+
+        return MI
+

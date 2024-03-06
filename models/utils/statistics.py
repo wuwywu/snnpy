@@ -201,4 +201,4 @@ class cal_kop:
         # 1、随时间变化的 Kuramoto Order parameter 存在 kuramoto
         # 2、每个神经元的相位变化存在 phase
         # 3、计算的时间为 first_last_spk -- last_first_spk
-        return np.mean(kuramoto), kuramoto, phase
+        return np.mean(kuramoto), kuramoto, phase, (first_last_spk, last_first_spk)

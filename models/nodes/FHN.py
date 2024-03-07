@@ -73,8 +73,9 @@ if __name__ == "__main__":
         mem.append(models.mem.copy())
         se(models.t, models.flaglaunch)
 
+    ax1 = plt.subplot(211)
     plt.plot(time, mem)
-    plt.figure()
+    plt.subplot(212, sharex=ax1)
     se.pltspikes()
     # print(se.Tspike_list)
 

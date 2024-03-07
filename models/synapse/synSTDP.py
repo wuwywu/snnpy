@@ -42,11 +42,11 @@ class synSTDP:
         # A_D*tau_D>A_P*tau_P: 抑制占主导；A_D*tau_D<A_P*tau_P: 增强占主导
         self.w_min = 0.001      # 设定权重最小值
         self.w_max = 1.0        # 设定权重最大值
-        self.A_P = 0.1  # 可塑性导致突触强度变化（增强）
-        self.tau_P = 10.    # 确定一个尖峰跟随另一个尖峰的时间（增强）
-        self.A_D = 0.06  # 可塑性导致突触强度变化（抑制）
-        self.tau_D = 10.    # 确定一个尖峰跟随另一个尖峰的时间（增强）
-        self.lr = 0.0001    # 学习率
+        self.A_P = 1  # 可塑性导致突触强度变化（增强）
+        self.tau_P = 1.8    # 确定一个尖峰跟随另一个尖峰的时间（增强）
+        self.A_D = 0.5  # 可塑性导致突触强度变化（抑制）
+        self.tau_D = 6.    # 确定一个尖峰跟随另一个尖峰的时间（增强）
+        self.lr = 1e-4    # 学习率
 
     def _fvars(self):
         # 0维度--post，1维度--pre

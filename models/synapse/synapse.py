@@ -23,7 +23,7 @@ class synbase:
     def __init__(self, pre, post, conn=None, synType="electr"):
         self.pre = pre      # 突触前神经元
         self.post = post    # 突触后神经元
-        self.iself = (self.pre is self.post)  # 判断是否只有一个子网络（突触前和和突触后神经元是一个）
+        # self.iself = (self.pre is self.post)  # 判断是否只有一个子网络（突触前和和突触后神经元是一个）
         self.conn = conn    # 连接矩阵
         self.dt = post.dt  # 计算步长
         # 选着突触类型
@@ -54,12 +54,14 @@ class synbase:
         # 保证syn不管何时创建都能与突触后有相同的时间
         self.t = self.post.t    # 这个是非常重要的
 
-        I = self.syn()
-        if not self.iself:  # 如果是两个网络则更新pre和post，否者只更新post
-            self.pre()  # 突触前神经元
-        self.post(I)  # 突触后神经元
+        I_post = self.syn()     # 突触后神经元接收的突触电流
+        # if not self.iself:  # 如果是两个网络则更新pre和post，否者只更新post
+        #     self.pre()  # 突触前神经元
+        # self.post(I)  # 突触后神经元
 
         self.t += self.dt  # 时间前进
+
+        return I_post
 
     def syn_electr(self, pre_mem=None, post_mem=None):
         """

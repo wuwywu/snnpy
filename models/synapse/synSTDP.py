@@ -65,7 +65,7 @@ class synSTDP:
         # 保证syn不管何时创建都能与突触后有相同的时间
         self.t = self.post.t    # 这个是非常重要的
 
-        I_post = self.syn()
+        I_post = self.syn()     # 突触后神经元接收的突触电流
         self._STDP()
 
         self.t += self.dt  # 时间前进
@@ -123,13 +123,3 @@ class synSTDP:
         g_syn = alpha * np.expand_dims((self.e - post_mem), axis=1)
         Isyn = (self.w * self.conn * g_syn).sum(axis=1)  # 0维度--post，1维度--pre
         return Isyn
-
-
-
-
-
-
-
-
-
-

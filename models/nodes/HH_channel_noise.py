@@ -114,4 +114,4 @@ if __name__ == "__main__":
     se.pltspikes()
     # print(se.Tspike_list)
 
-    plt.show()        
+    plt.show()

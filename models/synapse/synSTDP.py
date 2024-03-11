@@ -87,11 +87,13 @@ class synSTDP:
 
         # 使用Heaviside函数计算权重更新
         H_pos = np.where(delta_t > 0, 1, 0)  # 突触后神经元后放电
-        H_neg = np.where(delta_t <= 0, 1, 0)  # 突触前神经元后放电
+        H_neg = np.where(delta_t < 0, 1, 0)  # 突触前神经元后放电
+        # 对于delta_t == 0的情况
+        no_change = np.where(delta_t == 0, 0, 1)  # 当delta_t == 0时不更新权重
 
         # 应用STDP公式并乘以活跃连接矩阵，以确保只更新活跃连接的权重
         dw = (self.A_P * np.exp(-np.abs(delta_t) / self.tau_P) * H_pos -
-              self.A_D * np.exp(-np.abs(delta_t) / self.tau_D) * H_neg) * active_connections
+              self.A_D * np.exp(-np.abs(delta_t) / self.tau_D) * H_neg) * active_connections * no_change
 
         # 应用学习率
         self.w += self.lr * dw

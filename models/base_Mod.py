@@ -2,7 +2,7 @@
 # Author    : WuY<wuyong@mails.ccnu.edu.com>
 # Datetime  : 2024/2/24
 # User      : WuY
-# File      : base.py
+# File      : base_Mod.py
 # 将各种用于网络`节点`的基础功能集合到这里
 
 import os

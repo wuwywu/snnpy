@@ -2,7 +2,7 @@
 # Author    : WuY<wuyong@mails.ccnu.edu.com>
 # Datetime  : 2024/3/09
 # User      : WuY
-# File      : couple.py
+# File      : couple_template.py
 # 给出一个自定义耦合的模板
 
 import os

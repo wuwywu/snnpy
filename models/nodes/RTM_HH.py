@@ -16,7 +16,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import copy
 import numpy as np
 import matplotlib.pyplot as plt
-from base import Neurons
+from base_Mod import Neurons
 from utils.utils import spikevent
 
 class RTM_HH(Neurons):

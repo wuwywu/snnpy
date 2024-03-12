@@ -181,6 +181,7 @@ class cal_kop:
         time_vec = np.linspace(spkt[0], spkt[-1], int(ttotal / dt))
 
         phase = np.ones((len(filt_neurons), len(time_vec))) * -1
+        peak_id = np.ones((len(filt_neurons), len(time_vec))) * -1  # 记录相位属于的峰值编号
 
         for z, neuron_label in enumerate(filt_neurons):
             idx_individual_spikes = np.where(spkid == neuron_label)[0]  # 神经元放电的位置
@@ -189,10 +190,13 @@ class cal_kop:
                 ti = np.where(time_vec >= t)[0][0]  # t_n
                 tf = np.where(time_vec >= individual_spkt[i + 1])[0][0] # t_n+1
                 phase[z][ti:tf] = np.linspace(0, 2. * np.pi, (tf - ti))
+                peak_id[z][ti:tf] = i + 1  # 记录相位属于的峰值编号
 
         # 剪切出定义的相位的区间
         idxs = np.where((time_vec > first_last_spk) & (time_vec < last_first_spk))[0]
         phase = phase[:, idxs]
+        peak_id = peak_id[:, idxs]  # 剪切出定义的区间
+        peak_id -= peak_id[:, :1]
 
         # 计算 Kuramoto Order parameter
         kuramoto = np.abs(np.mean(np.exp(1j * phase), axis=0))
@@ -201,7 +205,7 @@ class cal_kop:
         # 1、随时间变化的 Kuramoto Order parameter 存在 kuramoto
         # 2、每个神经元的相位变化存在 phase
         # 3、计算的时间为 first_last_spk -- last_first_spk
-        return np.mean(kuramoto), kuramoto, phase, (first_last_spk, last_first_spk)
+        return np.mean(kuramoto), kuramoto, phase, peak_id, (first_last_spk, last_first_spk)
 
 
 # 计算尖峰序列的信息熵 entropy 和两个序列的互信息 mutual information

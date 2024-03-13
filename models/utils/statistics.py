@@ -203,7 +203,7 @@ class cal_kop:
 
         # 若需要则以输出以下量
         # 1、随时间变化的 Kuramoto Order parameter 存在 kuramoto
-        # 2、每个神经元的相位变化存在 phase
+        # 2、每个神经元的相位变化存在 2*pi*peak_id + phase
         # 3、计算的时间为 first_last_spk -- last_first_spk
         return np.mean(kuramoto), kuramoto, phase, peak_id, (first_last_spk, last_first_spk)
 

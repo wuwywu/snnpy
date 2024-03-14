@@ -112,6 +112,8 @@ class Synapse:
     def __init__(self, pre, post, conn=None, synType="electr", method="euler"):
         if method == "euler":   self.method = self._euler
         if method == "rk4":   self.method = self._rk4
+        # 选择突触类型
+        self.synType = synType
         if self.synType == "electr":
             self.syn = self.syn_electr  # 电突触
         elif self.synType == "chem":

@@ -45,7 +45,7 @@ class synSTDP:
         self.A_P = 1  # 可塑性导致突触强度变化（增强）
         self.tau_P = 1.8    # 确定一个尖峰跟随另一个尖峰的时间（增强）
         self.A_D = 0.5  # 可塑性导致突触强度变化（抑制）
-        self.tau_D = 6.    # 确定一个尖峰跟随另一个尖峰的时间（增强）
+        self.tau_D = 6.    # 确定一个尖峰跟随另一个尖峰的时间（抑制）
         self.lr = 1e-4    # 学习率
 
     def _fvars(self):

@@ -2,7 +2,7 @@
 # Author    : WuY<wuyong@mails.ccnu.edu.com>
 # Datetime  : 2024/2/28
 # User      : WuY
-# File      : statistics.py
+# File      : statis.py
 # 用于研究的统计量
 
 # device = "gpu"

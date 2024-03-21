@@ -131,6 +131,75 @@ class cal_cv:
         return cv, cv_mean
 
 
+class ISI_raster_net:
+    """
+    计算网络种每个节点的 ISIs
+        pltISI: 包含了所有的ISI序列
+        pltPlace: 对应 pltISI 中神经元的编号
+        pltTime: 对应ISI的计算时间
+
+    N : 建立神经元的数量
+    th_up: 判断发放开始阈值
+    th_down=0: 判断发放结束阈值
+    max: 初始最大值
+    """
+    def __init__(self, N, th_up=0, th_down=0, max=-70):
+        '''
+        HH可以设置为：th_up=0, th_down=0, max=-70.0
+        '''
+        self.num = N  # 节点数量
+        self.reset_init(th_up=th_up, th_down=th_down, max=max)
+        self.pltPlace = []
+        self.pltTime = []
+        self.pltISI = []
+
+    def reset_init(self, th_up, th_down, max):
+        self.th_up = th_up  # 阈上值
+        self.th_down = th_down  # 阈下值
+        self.max_init = max  # 初始最大值
+        self.max = max + np.zeros(self.num)  # 初始变化最大值
+        self.nn = np.zeros(self.num)  # 记录每个节点的ISI的个数
+        self.flag = np.zeros(self.num)  # 放电标志
+        self.T_pre = np.zeros(self.num)  # 前峰时间
+        self.T_post = np.zeros(self.num)  # 后峰时间
+
+    def __call__(self, t, mem):
+        """
+        t: 运行时间
+        mem: 输入需要计算的变量（eg. 膜电位）
+        在非人工神经元中，计算神经元的spiking
+        """
+        # -------------------- 放电开始 --------------------
+        firing_StartPlace = np.where((mem > self.th_up) & (self.flag == 0))  # 放电开始的位置
+        self.flag[firing_StartPlace] = 1  # 放电标志改为放电
+        # -------------------- 放电期间 --------------------
+        firing_Place = np.where((mem > self.max) & (self.flag == 1))  # 放电期间并且还没有到达峰值
+        self.max[firing_Place] = mem[firing_Place]
+        self.T_post[firing_Place] = t
+        #  -------------------- 放电结束 -------------------
+        firing_endPlace = np.where((mem < self.th_down) & (self.flag == 1))  # 放电结束的位置
+        firing_endPlace2 = np.where((mem < self.th_down) & (self.flag == 1) & (self.nn > 2))  # 放电结束的位置2
+        self.flag[firing_endPlace] = 0  # 放电标志改为放电
+        self.nn[firing_endPlace] += 1  # 结束放电ISI数量+1
+
+        ISI = self.T_post[firing_endPlace2] - self.T_pre[firing_endPlace2]
+
+        self.pltTime.extend(self.T_post[firing_endPlace2])
+        self.pltPlace.extend(firing_endPlace2[0])
+        self.pltISI.extend(ISI)
+
+        self.T_pre[firing_endPlace] = self.T_post[firing_endPlace]
+        self.max[firing_endPlace] = self.max_init
+
+    def plot_raster(self, markersize=2, color="k"):
+        plt.plot(self.pltTime, self.pltPlace, "o",
+                 markersize=markersize, color=color)
+
+    def plot_ISI(self, markersize=2, color="k"):
+        plt.plot(self.pltTime, self.pltISI, "o",
+                 markersize=markersize, color=color)
+
+
 # Kuramoto Order parameter
 class cal_kop:
     """

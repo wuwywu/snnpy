@@ -141,6 +141,7 @@ class Synapse:
         arg:
             models: 突触模型函数，返回所有dvars_dt
             *args： 输入所有变量，与dvars_dt一一对应
+            # 注意只有一个变量的时候，返回必须为 dvar_dt, “,"是必须的
         """
         vars = list(args)      # 所有的变量
         dvars_dt = models()   # 所有变量的的微分方程
@@ -154,6 +155,7 @@ class Synapse:
         arg:
             models: 突触模型函数，返回所有dvars_dt
             *args： 输入所有变量，与dvars_dt一一对应
+            # 注意只有一个变量的时候，返回必须为 dvar_dt, “,"是必须的
         """
         vars = list(args)     # 所有的变量
         original_vars = copy.deepcopy(vars) # 原始状态备份

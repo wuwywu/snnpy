@@ -220,19 +220,20 @@ def mLCE(system: DynamicalSystem, n_forward: int, n_compute: int, keep:bool=Fals
 
 
 # Lyapunov characteristic exponents (LCE)
-def LCE(system : DynamicalSystem, p : int, n_forward : int, n_compute : int, keep:bool=False):
+def LCE(system : DynamicalSystem, n_forward : int, n_compute : int, p:int=None, keep:bool=False):
     '''
     Compute LCE.
         Parameters:
             system (DynamicalSystem): Dynamical system for which we want to compute the LCE.
-            p (int): Number of LCE to compute.
             n_forward (int): Number of steps before starting the LCE computation.
             n_compute (int): Number of steps to compute the LCE, can be adjusted using keep_evolution.
+            p (int): Number of LCE to compute.
             keep (bool): If True return a numpy array of dimension (n_compute,p) containing the evolution of LCE.
         Returns:
             LCE (numpy.ndarray): Lyapunov Charateristic Exponents.
             history (numpy.ndarray): Evolution of LCE during the computation.
     '''
+    if p is None: p = system.dim
     # Forward the system before the computation of LCE
     system.forward(n_forward, False)
 
@@ -262,21 +263,22 @@ def LCE(system : DynamicalSystem, p : int, n_forward : int, n_compute : int, kee
 
 
 # Covariant Lyapunov vectors (CLV)
-def CLV(system: DynamicalSystem, p: int, n_forward: int, n_A: int, n_B: int, n_C: int, traj: bool, check=False):
+def CLV(system: DynamicalSystem, n_forward: int, n_A: int, n_B: int, n_C: int, traj: bool, p:int=None, check=False):
     '''
     Compute CLV.
         Parameters:
             system (DynamicalSystem): Dynamical system for which we want to compute the mLCE.
-            p (int): Number of CLV to compute.
             n_forward (int): Number of steps before starting the CLV computation.
             n_A (int): Number of steps for the orthogonal matrice Q to converge to BLV.
             n_B (int): Number of time steps for which Phi and R matrices are stored and for which CLV are computed.
             n_C (int): Number of steps for which R matrices are stored in order to converge A to A-.
             traj (bool): If True return a numpy array of dimension (n_B,system.dim) containing system's trajectory at the times CLV are computed.
+            p (int): Number of CLV to compute.
         Returns:
             CLV (List): List of numpy.array containing CLV computed during n_B time steps.
             history (numpy.ndarray): Trajectory of the system during the computation of CLV.
     '''
+    if p is None: p = system.dim
     # Forward the system before the computation of CLV
     system.forward(n_forward, False)
 

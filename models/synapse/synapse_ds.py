@@ -4,6 +4,7 @@
 # User      : WuY
 # File      : synapse_ds.py
 # ds/dt形式的化学突触模型
+# 这个突触形式与离子通道的开关有关
 
 import os
 import sys

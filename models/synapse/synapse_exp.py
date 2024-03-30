@@ -23,6 +23,7 @@ class synbase_exp(Synapse):
     post: 突触后神经元
     conn: 连接矩阵
     synType: 突触类型["electr", "chem_exp"]
+    method: 计算非线性微分方程的方法，（"eluer", "rk4"）
     """
     def __init__(self, pre, post, conn=None, synType="chem_exp", method="euler"):
         super().__init__(pre=pre, post=post, conn=conn, synType=synType, method=method)
@@ -240,6 +241,7 @@ class syn_exp_stdp(Synapse):
         # 更新w (0维度--post，1维度--pre)
         self.w[:, prespikingPlace] += -self.Apost[:, None]
         self.w[postspikingPlace, :] += self.Apre[None, :]
+        self.w = np.clip(self.w, self.wmin, self.wmax)  # 限定范围
 
     def _dg_dt(self):
         # 只有一个变量的时候，返回必须加“ , ”

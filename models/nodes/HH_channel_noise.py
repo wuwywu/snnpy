@@ -55,6 +55,7 @@ class HH_cn(Neurons):
         self.m = 0.5 * np.random.rand(self.num)
         self.n = 1 * np.random.rand(self.num)
         self.h = 0.6 * np.random.rand(self.num)
+        self.N_vars = 4  # 变量的数量
 
     def _HH(self, I):
         alpha_m = (self.mem + 40)/((1-np.exp(-(self.mem + 40)/10))*10)
@@ -70,16 +71,29 @@ class HH_cn(Neurons):
 
         dmem_dt = (-self._g_Na * np.power(self.m, 3) * self.h * (self.mem - self._E_Na) \
                  - self._g_K * np.power(self.n, 4) * (self.mem - self._E_K) \
-                 - self._g_L * (self.mem - self._E_L) + I) / self._Cm
-        dm_dt = alpha_m * (1-self.m) - beta_m * self.m + self._noise(D_m)
-        dn_dt = alpha_n * (1-self.n) - beta_n * self.n + self._noise(D_n)
-        dh_dt = alpha_h * (1-self.h) - beta_h * self.h + self._noise(D_h)
+                 - self._g_L * (self.mem - self._E_L) + I[0]) / self._Cm
+        dm_dt = alpha_m * (1-self.m) - beta_m * self.m + self._noise(D_m) + I[1]
+        dn_dt = alpha_n * (1-self.n) - beta_n * self.n + self._noise(D_n) + I[2]
+        dh_dt = alpha_h * (1-self.h) - beta_h * self.h + self._noise(D_h) + I[3]
 
         return dmem_dt, dm_dt, dn_dt, dh_dt
 
-    def __call__(self, Io=0):
-        I = self.Iex+Io        # 恒定的外部激励
-        self.method(self._HH, I, self.mem, self.m, self.n, self.h)  
+    def __call__(self, Io=0, axis=[0]):
+        """
+        args:
+           Io: 输入到神经元模型的外部激励，
+               shape:
+                   (len(axis), self.num)
+                   (self.num, )
+                   float
+           axis: 需要加上外部激励的维度
+               list
+        """
+        I = np.zeros((self.N_vars, self.num))
+        I[0, :] = self.Iex  # 恒定的外部激励
+        I[axis, :] += Io
+
+        self.method(self._HH, I, self.mem, self.m, self.n, self.h)
         self._spikes_eval(self.mem)  # 放电测算
 
         self.t += self.dt  # 时间前进  

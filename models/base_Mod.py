@@ -86,7 +86,21 @@ class Neurons:
         for i in range(lens):
             vars[i] += original_vars[i] + dt*(k1[i] + 2*k2[i] + 2*k3[i] + k4[i])/6 - vars[i]
 
-    def __call__(self):
+    def __call__(self, Io=0, axis=[0]):
+        """
+        args:
+            Io: 输入到神经元模型的外部激励，
+                shape:
+                    (len(axis), self.num)
+                    (self.num, )
+                    float
+            axis: 需要加上外部激励的维度
+                list
+        """
+        # I = np.zeros((self.N_vars, self.num))
+        # I[0, :] = self.Iex  # 恒定的外部激励
+        # I[axis, :] += Io
+
         self.t += self.dt  # 时间前进
 
     def _spikes_eval(self, mem):

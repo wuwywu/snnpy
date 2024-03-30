@@ -52,15 +52,28 @@ class LIF(Neurons):
     def _vars(self):
         self.t = 0  # 运行时间
         self.mem = np.random.uniform(self.V_reset, self.threshold, self.num)
-        print(self.mem)
+        self.N_vars = 1  # 变量的数量
 
     def _lif(self, I):
-        dmem_dt = (-self.mem + self.V_rest + self.R * I) / self.tau
+        dmem_dt = (-self.mem + self.V_rest + self.R * I[0]) / self.tau
         # 注意只有一个变量的时候，返回必须为 dvar_dt, “,"是必须的
         return dmem_dt,
 
-    def __call__(self, Io=0):
-        I = self.Iex + Io  # 恒定的外部激励
+    def __call__(self, Io=0, axis=[0]):
+        """
+        args:
+            Io: 输入到神经元模型的外部激励，
+                shape:
+                    (len(axis), self.num)
+                    (self.num, )
+                    float
+            axis: 需要加上外部激励的维度
+                list
+        """
+        I = np.zeros((self.N_vars, self.num))
+        I[0, :] = self.Iex  # 恒定的外部激励
+        I[axis, :] += Io
+
         self.method(self._lif, I, self.mem)  #
         self._spikes_eval(self.mem)  # 放电测算
 

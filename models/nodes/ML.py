@@ -56,21 +56,35 @@ class ML(Neurons):
         # Model variables
         self.mem = np.random.rand(self.num) * 100 - 50  # Membrane potential, initialized randomly
         self.W = np.random.rand(self.num)  # Probability for K+ channel activation, initialized randomly
+        self.N_vars = 2  # 变量的数量
 
     def _ml(self, I):
         M_inf = 0.5 * (1 + np.tanh((self.mem - self.V1) / self.V2))
         W_inf = 0.5 * (1 + np.tanh((self.mem - self.V3) / self.V4))
         tau_W = 1 / np.cosh((self.mem - self.V3) / (2 * self.V4))
 
-        dmem_dt = (1 / self.C) * (I - self.gCa * M_inf * (self.mem - self.VCa)
+        dmem_dt = (1 / self.C) * (I[0] - self.gCa * M_inf * (self.mem - self.VCa)
                                   - self.gK * self.W * (self.mem - self.VK)
                                   - self.gL * (self.mem - self.VL))
-        dW_dt = self.phi * (W_inf - self.W) / tau_W
+        dW_dt = self.phi * (W_inf - self.W) / tau_W + I[1]
 
         return dmem_dt, dW_dt
 
-    def __call__(self, Io=0):
-        I = self.Iex+Io  # External current
+    def __call__(self, Io=0, axis=[0]):
+        """
+        args:
+            Io: 输入到神经元模型的外部激励，
+                shape:
+                    (len(axis), self.num)
+                    (self.num, )
+                    float
+            axis: 需要加上外部激励的维度
+                list
+        """
+        I = np.zeros((self.N_vars, self.num))
+        I[0, :] = self.Iex  # 恒定的外部激励
+        I[axis, :] += Io
+
         # Update the variables using the chosen numerical method
         self.method(self._ml, I, self.mem, self.W)
         # Evaluation of spikes

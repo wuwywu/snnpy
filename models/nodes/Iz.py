@@ -56,14 +56,28 @@ class Iz(Neurons):
         # 模型
         self.mem = np.random.uniform(-.10, .10, self.num)
         self.u = np.random.rand(self.num)
+        self.N_vars = 2  # 变量的数量
 
     def _Iz(self, I):
-        dmem_dt = 0.04 * self.mem * self.mem + 5 * self.mem - self.u + 140 + I
-        du_dt = self.a * (self.b * self.mem - self.u)
+        dmem_dt = 0.04 * self.mem * self.mem + 5 * self.mem - self.u + 140 + I[0]
+        du_dt = self.a * (self.b * self.mem - self.u) + I[1]
         return dmem_dt, du_dt
 
-    def __call__(self, Io=0):
-        I = self.Iex + Io  # 恒定的外部激励
+    def __call__(self, Io=0, axis=[0]):
+        """
+        args:
+            Io: 输入到神经元模型的外部激励，
+                shape:
+                    (len(axis), self.num)
+                    (self.num, )
+                    float
+            axis: 需要加上外部激励的维度
+                list
+        """
+        I = np.zeros((self.N_vars, self.num))
+        I[0, :] = self.Iex  # 恒定的外部激励
+        I[axis, :] += Io
+
         self.method(self._Iz, I, self.mem, self.u)  #
         self._spikes_eval(self.mem)  # 放电测算
 

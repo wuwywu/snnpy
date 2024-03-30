@@ -43,15 +43,29 @@ class FHN(Neurons):
         # 模型变量
         self.mem = np.random.rand(self.num)
         self.y = np.random.rand(self.num)
+        self.N_vars = 2 # 变量的数量
         # self.t = 0  # 运行时间
 
     def _fhn(self, I):
-        dmem_dt = self.mem - self.mem ** 3 / 3 - self.y + I
-        dy_dt = self.a * (self.mem + self.c - self.b * self.y)
+        dmem_dt = self.mem - self.mem ** 3 / 3 - self.y + I[0]
+        dy_dt = self.a * (self.mem + self.c - self.b * self.y) + I[1]
         return dmem_dt, dy_dt
 
-    def __call__(self, Io=0):
-        I = self.Iex+Io        # 恒定的外部激励
+    def __call__(self, Io=0, axis=[0]):
+        """
+        args:
+            Io: 输入到神经元模型的外部激励，
+                shape:
+                    (len(axis), self.num)
+                    (self.num, )
+                    float
+            axis: 需要加上外部激励的维度
+                list
+        """
+        I = np.zeros((self.N_vars, self.num))
+        I[0, :] = self.Iex        # 恒定的外部激励
+        I[axis, :] += Io
+
         self.method(self._fhn, I, self.mem, self.y)  #
         self._spikes_eval(self.mem)  # 放电测算
 
@@ -68,7 +82,9 @@ if __name__ == "__main__":
     se = spikevent(N)
 
     for i in range(10000):
-        models()
+        # I = np.random.rand(2, N)*0.01
+        # I = np.zeros((2, N))
+        models(Io=1)
         time.append(models.t)
         mem.append(models.mem.copy())
         se(models.t, models.flaglaunch)

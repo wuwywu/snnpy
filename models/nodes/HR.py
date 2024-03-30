@@ -50,16 +50,30 @@ class HR(Neurons):
         self.mem = np.random.rand(self.num) - 1.5  # Membrane potential variable, initialized randomly
         self.y = np.random.rand(self.num) - 10.  # Recovery variable
         self.z = np.random.rand(self.num) - 0.5  # Adaptation variable
+        self.N_vars = 3  # 变量的数量
         # self.t = 0  # 运行时间
 
     def _hr(self, I):
-        dx_dt = self.y - self.a * self.mem ** 3 + self.b * self.mem ** 2 - self.z + I
-        dy_dt = self.c - self.d * self.mem ** 2 - self.y
-        dz_dt = self.r*(self.s * (self.mem - self.xR) - self.z)
+        dx_dt = self.y - self.a * self.mem ** 3 + self.b * self.mem ** 2 - self.z + I[0]
+        dy_dt = self.c - self.d * self.mem ** 2 - self.y + I[1]
+        dz_dt = self.r*(self.s * (self.mem - self.xR) - self.z) + I[2]
         return dx_dt, dy_dt, dz_dt
 
-    def __call__(self, Io=0):
-        I = self.Iex+Io  # External stimulus
+    def __call__(self, Io=0, axis=[0]):
+        """
+        args:
+            Io: 输入到神经元模型的外部激励，
+                shape:
+                    (len(axis), self.num)
+                    (self.num, )
+                    float
+            axis: 需要加上外部激励的维度
+                list
+        """
+        I = np.zeros((self.N_vars, self.num))
+        I[0, :] = self.Iex  # 恒定的外部激励
+        I[axis, :] += Io
+
         # Update the variables using the chosen numerical method
         self.method(self._hr, I, self.mem, self.y, self.z)
         # Evaluation of spikes

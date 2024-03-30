@@ -64,6 +64,7 @@ class HH(Neurons):
         self.m = 0.5 * np.random.rand(self.num)
         self.n = 1 * np.random.rand(self.num)
         self.h = 0.6 * np.random.rand(self.num)
+        self.N_vars = 4  # 变量的数量
         # 电磁
         # self.f = 0.1 * np.random.rand(self.num)
 
@@ -76,13 +77,13 @@ class HH(Neurons):
         # HH模型
         dmem_dt = (-self._g_Na * np.power(self.m, 3) * self.h * (self.mem - self._E_Na) \
                  - self._g_K * np.power(self.n, 4) * (self.mem - self._E_K) \
-                 - self._g_L * (self.mem - self._E_L) + I) / self._Cm
+                 - self._g_L * (self.mem - self._E_L) + I[0]) / self._Cm
         dm_dt = 0.1 * (self.mem + 40.0) / (1.0 - np.exp(-(self.mem + 40) / 10.0)) * (1.0 - self.m) \
-                - 4.0 * np.exp(-(self.mem + 65.0) / 18.0) * self.m
+                - 4.0 * np.exp(-(self.mem + 65.0) / 18.0) * self.m + I[1]
         dn_dt = 0.01 * (self.mem + 55.0) / (1 - np.exp(-(self.mem + 55) / 10)) * (1 - self.n) \
-                - 0.125 * np.exp(-(self.mem + 65.0) / 80) * self.n
+                - 0.125 * np.exp(-(self.mem + 65.0) / 80) * self.n + I[2]
         dh_dt = 0.07 * np.exp(-(self.mem + 65.0) / 20.0) * (1.0 - self.h) \
-                - 1.0 / (1.0 + np.exp(-(self.mem + 35.0) / 10.0)) * self.h
+                - 1.0 / (1.0 + np.exp(-(self.mem + 35.0) / 10.0)) * self.h + I[3]
         if self.temperature is not None:
             dm_dt *= self.phi
             dn_dt *= self.phi
@@ -90,8 +91,21 @@ class HH(Neurons):
 
         return dmem_dt, dm_dt, dn_dt, dh_dt
 
-    def __call__(self, Io=0):
-        I = self.Iex+Io        # 恒定的外部激励
+    def __call__(self, Io=0, axis=[0]):
+        """
+        args:
+            Io: 输入到神经元模型的外部激励，
+                shape:
+                    (len(axis), self.num)
+                    (self.num, )
+                    float
+            axis: 需要加上外部激励的维度
+                list
+        """
+        I = np.zeros((self.N_vars, self.num))
+        I[0, :] = self.Iex  # 恒定的外部激励
+        I[axis, :] += Io
+
         self.method(self._HH, I, self.mem, self.m, self.n, self.h)  #
         self._spikes_eval(self.mem)  # 放电测算
 

@@ -10,6 +10,7 @@ import sys
 import copy
 import numpy as np
 
+# 神经元模型的基类
 class Neurons:
     """
     N: 创建神经元的数量
@@ -103,6 +104,7 @@ class Neurons:
         self.flag[firing_endPlace] = 0  # 放电标志改为放电
 
 
+# 突触模型的基类
 class Synapse:
     """
     pre: 网络前节点

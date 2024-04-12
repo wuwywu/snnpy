@@ -65,6 +65,7 @@ def jac(x, t):
     res[3, 0], res[3, 1], res[3, 2], res[3, 3] = k1, 0, 0, -k2
     return res
 
+
 # FitzHugh-Nagumo(FHN) 模型
 def FHN(x, t):
     res = np.zeros_like(x)
@@ -88,5 +89,25 @@ def jac(x, t):
     # 输出函数变量
     res[0, 0], res[0, 1] = (1-ξ)-x[0]*x[0], -1
     res[1, 0], res[1, 1] = c, -c*b
+    return res
+
+def FHN2(x, t):
+    res = np.zeros_like(x)
+    # 常数
+    a = 0.5
+    b = 0.05
+    # 输出函数变量
+    res[0] = (x[0] - np.power(x[0], 3) / 3 - x[1])/b
+    res[1] = x[0] + a
+    return res
+
+def jac(x, t):
+    res = np.zeros((x.shape[0], x.shape[0]))
+    # 常数
+    a = 0.5
+    b = 0.05
+    # 输出函数变量
+    res[0, 0], res[0, 1] = (1-x[0]*x[0])/b, -1/b
+    res[1, 0], res[1, 1] = 1, 0
     return res
 

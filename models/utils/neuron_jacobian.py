@@ -7,6 +7,7 @@
 
 import numpy as np
 
+# ====================== neuron ======================
 # Hindmarsh-Rose(HR) 模型
 def HR(x, t):
     res = np.zeros_like(x)
@@ -109,5 +110,32 @@ def jac(x, t):
     # 输出函数变量
     res[0, 0], res[0, 1] = (1-x[0]*x[0])/b, -1/b
     res[1, 0], res[1, 1] = 1, 0
+    return res
+
+
+# ====================== chaos ======================
+# lorenz系统
+def lorenz(x, t):
+    res = np.zeros_like(x)
+    # 常数
+    SIGMA = 10
+    R = 28
+    BETA = 8 / 3
+    # 输出函数变量
+    res[0] = SIGMA * (x[1] - x[0])
+    res[1] = R * x[0] - x[1] - x[0] * x[2]
+    res[2] = x[0] * x[1] - BETA * x[2]
+    return res
+
+def jac(x, t):
+    res = np.zeros((x.shape[0], x.shape[0]))
+    # 常数
+    SIGMA = 10
+    R = 28
+    BETA = 8 / 3
+    # 输出函数变量
+    res[0, 0], res[0, 1], res[0, 2] = -SIGMA, SIGMA, 0
+    res[1, 0], res[1, 1], res[1, 2] = R - x[2], -1, -x[0]
+    res[2, 0], res[2, 1], res[2, 2] = x[1], x[0], -BETA
     return res
 

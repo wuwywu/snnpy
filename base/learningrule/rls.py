@@ -100,7 +100,7 @@ class DLS:
         delta_w = (as_ * local_error)[:, np.newaxis] * Prs
         np.add.at(w, self.local, -delta_w)
 
-    def train(self, re_factor, factor, mem, self_y=None, dt=0.01):
+    def train(self, re_factor, factor, input_mem, self_y=None, dt=0.01):
         """
         用来训练你想要修正的值,使得状态变量同步
         args:
@@ -116,10 +116,10 @@ class DLS:
         if self_y is not None:
             yMean = self_y  # 监督学习
         else:
-            yMean = mem[self.local].mean()
+            yMean = input_mem[self.local].mean()
 
         # 最小二乘法差值(self.num,)
-        error_y = mem - yMean
+        error_y = input_mem - yMean
 
         self.forward(re_factor, input, error_y)
 

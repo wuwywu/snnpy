@@ -61,7 +61,73 @@ class RLS(nn.Module):
         """
         self.P = torch.stack([self.alpha * torch.eye(self.in_num) for i in range(out_num)])
 
+# ================================== dynamic learning of synchronization (DLS) algorithm =============
+# 最新版的 DLS
+class DLS:
+    """
+    dynamic learning of synchronization (DLS) algorithm
+    这个版本解决的问题:
+    1. 解决了并行运行的问题
+    2. 解决了学习参量过多时,内存过大的bug
 
+    args:
+        N : 需要学习的参量数
+        local : 需要调整的状态变量的位置
+        alpha : 使用 DLS 的学习率参数
+    """
+    def __init__(self, N=1, local=[1, 2], alpha=0.1):
+        self.num = N        # 需要学习的参量数
+        self.local = local  # 需要调整的状态变量的位置
+        self.alpha = alpha  # 使用 DLS 的学习率参数
+        # 存储每个local元素对应的单位矩阵对角线乘以alpha
+        self.P = np.full((len(local), N), self.alpha)
+
+    def forward(self, w, input, error):
+        local_input = input[self.local]     # 形状是 (len(self.local), N)
+        local_error = error[self.local]     # 形状是 (len(self.local),)
+
+        # 计算 Prs（仅需要对角线与输入相乘）
+        Prs = self.P * local_input  # 直接逐元素相乘
+
+        # 计算 a 的向量化版本
+        as_ = 1.0 / (1.0 + np.sum(local_input * Prs, axis=1))
+
+        # 更新 Ps，只更新对角线部分
+        P_updates = as_[:, np.newaxis] * (Prs ** 2)
+        self.P -= P_updates
+
+        # 更新权重 w，使用高级索引和广播去除for循环
+        delta_w = (as_ * local_error)[:, np.newaxis] * Prs
+        np.add.at(w, self.local, -delta_w)
+
+    def train(self, re_factor, factor, mem, self_y=None, dt=0.01):
+        """
+        用来训练你想要修正的值,使得状态变量同步
+        args:
+            rev_factor : 需要更新的参数：如权重或设定的需要修正的值 (N_状态变量 , self.num)
+            factor : 与rev_factor相乘的量    (N_状态变量 , self.num)
+            input_mem : 时刻 t+1 的状态变量, 在给出其他量后   (N_状态变量 ,)
+            self_y : 自定义输入的值，与这个值同步 (N_状态变量,)
+            dt  :   积分步长
+        """
+        # 外部因素的输入值(self.num, self.Inum)
+        input = factor * dt  # (N_状态变量 , self.num)
+
+        if self_y is not None:
+            yMean = self_y  # 监督学习
+        else:
+            yMean = mem[self.local].mean()
+
+        # 最小二乘法差值(self.num,)
+        error_y = mem - yMean
+
+        self.forward(re_factor, input, error_y)
+
+    def reset(self):
+        self.P = np.full((len(self.local), self.num), self.alpha)
+
+
+# ================================== DLS 旧版 ==================================
 # dynamic learning of synchronization (DLS) algorithm
 class RLS_complex(nn.Module):
     def __init__(self, N=1, local=[0,], alpha=1.0):

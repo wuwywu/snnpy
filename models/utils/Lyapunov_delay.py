@@ -134,6 +134,77 @@ class ContinuousDS:
 
         self.t += self.dt
 
+
+# 离散动力系统
+class DiscreteDS:
+    '''
+    连续动力系统的实例化。
+        Parameters:
+            x0 (numpy.ndarray)：初始条件 (系统)。
+            f_delay (function)：ẋ = f(x, x_tau, t) 或 x_(n 1) = f(x_n, x_tau) 的函数 f。
+            jac_delay (function): f 相对于 x 的雅可比行列式。
+            tau (int): 延迟时间 (离散系统，延时为多少，拓展到tau+1维)。
+            t0 (float): 初始时间。
+            kwargs (dict): f 和 jac 的参数字典。
+    '''
+    def __init__(self, x0, f_delay, jac_delay, tau, t0=0, **kwargs):
+        # 保留初始值
+        self.x0 = x0
+        self.t0 = t0
+
+        self.dim = len(x0)  # 变量维度
+        self.N = int(tau+1)   # 拓展维度
+
+        # 变量从初始值开始（变量初始值：dimxN; 微扰初始值：dimxNxN）
+        self.x = np.tile(x0[:, np.newaxis], (1, self.N))  # (dim, N)
+        self.xnew = np.zeros_like(self.x[:, 0])
+
+        # 微扰变量
+        self.delta_x = np.zeros((self.dim, N, self.dim * N))  # (dim, t, N)
+        self.delta_x[:, 0, :] = 1
+        # np.fill_diagonal(self.delta_x[:, 0, :], 1)  # 对于每个维度，设置初始微扰在第0个时间点的对角线为1
+        self.delta_xnew = np.zeros_like(self.delta_x[:, 0, :])
+
+        self.t = t0
+
+        self.f_delay = f_delay
+        self.jac_delay = jac_delay
+
+        self.dt = 1
+
+        self.kwargs = kwargs
+
+    def next(self):
+        '''
+        使用 Euler/rk4 方法计算一个时间步后系统的状态。
+        '''
+        x_0 = self.x[:, 0]
+        x_tau = self.x[:, -1]
+
+        self.xnew[:] = self.f_delay(x_0, x_tau, self.t)  # 更新当前状态变量 (dim, )
+
+    def next_delta_x(self):
+        '''
+        使用 Euler/rk4 方法计算一个时间步后偏差的状态。
+        '''
+        x_0 = self.x[:, 0]
+        x_tau = self.x[:, -1]
+        delta_x_0 = self.delta_x[:, 0, :]
+        delta_x_tau = self.delta_x[:, -1, :]
+
+        df_dx, df_dx_tau = self.jac_delay(x_0, x_tau, self.t)
+        self.delta_xnew[:, :] = df_dx @ delta_x_0 + df_dx_tau @ delta_x_tau
+
+    def update_tau(self):
+        self.x[:, 1:] = self.x[:, :-1]
+        self.delta_x[:, 1:, :] = self.delta_x[:, :-1, :]
+
+        self.x[:, 0] = self.xnew[:]
+        self.delta_x[:, 0, :] = self.delta_xnew[:, :]
+
+        self.t += self.dt
+
+
 # Lyapunov characteristic exponents (LCE)
 def LCE(system, n_forward : int, n_compute : int, jit=True):
     """
@@ -179,6 +250,8 @@ def LCE(system, n_forward : int, n_compute : int, jit=True):
 
     return mle
 
+
+# ============================================= 下面都是方法 =============================================
 def gram_schmidt(X):
     p, m, n = X.shape
     X_new = X.reshape(p*m, n)

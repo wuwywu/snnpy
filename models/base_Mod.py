@@ -10,12 +10,13 @@ import sys
 import copy
 import numpy as np
 
-# 神经元模型的基类
+# ================================= 神经元模型的基类 =================================
 class Neurons:
     """
     N: 创建神经元的数量
     method ： 计算非线性微分方程的方法，（"eluer", "rk4"）
     dt ： 计算步长
+
     神经元的膜电位都写为：mem
     运行时间：t; 时间步长：dt
     神经元数量：num
@@ -117,8 +118,80 @@ class Neurons:
         firing_endPlace = np.where((mem < self.th_down) & (self.flag == 1))  # 放电结束的位置
         self.flag[firing_endPlace] = 0  # 放电标志改为放电
 
+# ================================= 离散模型的基类 =================================
+class DiscreteDS:
+    """
+    N: 创建节点的数量
 
-# 突触模型的基类
+    第一维的状态变量(神经元的膜电位)都写为：mem
+    运行时间：t;
+    节点数量：num
+    """
+    def __init__(self, N):
+        self.num = N  # 神经元数量
+        self._fparams()
+        self._fvars()
+
+    def _fparams(self):
+        self.th_up = 0  # 放电阈值
+        self.th_down = 0  # 放电阈下值
+
+    def _fvars(self):
+        self.t = 0  # 运行时间
+        # 模型放电变量
+        self.flag = np.zeros(self.num, dtype=int)           # 模型放电标志
+        self.flaglaunch = np.zeros(self.num, dtype=int)     # 模型开始放电标志
+        self.firingTime = np.zeros(self.num)                # 记录放电时间
+
+    def method(self,  models, I, *args):
+        """
+        map模型向前进一步
+        arg:
+            models: 神经元模型函数，输入一个外部激励(所有激励合在一起)，返回所有dvars_dt
+            I: 外部激励，所有激励合在一起
+            *args： 输入所有变量，与dvars_dt一一对应
+            # 注意只有一个变量的时候，返回必须为 var_new, “,"是必须的
+        """
+        vars = list(args)  # 所有的变量
+        var_new = models(I)  # 所有变量的的微分方程
+        lens = len(var_new)  # 变量的数量
+        # print(var_new)
+        for i in range(lens):  # 变量更新
+            vars[i][:] = var_new[i]
+
+    def __call__(self, Io=0, axis=[0]):
+        """
+        args:
+            Io: 输入到模型的外部激励，
+                shape:
+                    (len(axis), self.num)
+                    (self.num, )
+                    float
+            axis: 需要加上外部激励的维度
+                list
+        """
+        # I = np.zeros((self.N_vars, self.num))
+        # I[0, :] = self.Iex  # 恒定的外部激励
+        # I[axis, :] += Io
+
+        self.t += 1  # 时间前进
+
+    def _spikes_eval(self, mem):
+        """
+        在非人工神经元中，计算神经元的spiking
+        """
+        # -------------------- 放电开始 --------------------
+        self.flaglaunch[:] = 0  # 重置放电开启标志
+        firing_StartPlace = np.where((mem > self.th_up) & (self.flag == 0))  # 放电开始的位置
+        self.flag[firing_StartPlace] = 1  # 放电标志改为放电
+        self.flaglaunch[firing_StartPlace] = 1  # 放电开启标志
+        self.firingTime[firing_StartPlace] = self.t  # 记录放电时间
+        #  -------------------- 放电结束 -------------------
+        firing_endPlace = np.where((mem < self.th_down) & (self.flag == 1))  # 放电结束的位置
+        self.flag[firing_endPlace] = 0  # 放电标志改为放电
+
+
+# ================================= 突触模型的基类 =================================
 class Synapse:
     """
     pre: 网络前节点

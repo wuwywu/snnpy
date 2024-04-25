@@ -139,3 +139,23 @@ def jac(x, t):
     res[2, 0], res[2, 1], res[2, 2] = x[1], x[0], -BETA
     return res
 
+
+# ====================== map models ======================
+def Chialvo(x, t):
+    res = np.zeros_like(x)
+    # 模型常数
+    a = 0.89
+    b = 0.6  # 0.6 to 0.18 oscillations to aperiodic burst
+    c = 0.28
+    k = 0.03
+    res[0]= (res[0]** 2) * np.exp(res[1] - res[0]) + k
+    res[1] = a * res[1] - b * res[0] + c
+    return res
+
+def jac(x, t):
+    res = np.zeros((x.shape[0], x.shape[0]))
+    res[0, 0] = (2 * x[0]) * np.exp(x[1] - x[0]) + (x[0]** 2) * np.exp(x[1] - x[0])
+    res[0, 1] = (x[0]** 2) * np.exp(x[1] - x[0])
+    res[1, 0], res[1, 1] = -b, a
+    return res
+

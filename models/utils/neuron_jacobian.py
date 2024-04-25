@@ -148,8 +148,8 @@ def Chialvo(x, t):
     b = 0.6  # 0.6 to 0.18 oscillations to aperiodic burst
     c = 0.28
     k = 0.03
-    res[0]= (res[0]** 2) * np.exp(res[1] - res[0]) + k
-    res[1] = a * res[1] - b * res[0] + c
+    res[0]= (x[0]** 2) * np.exp(x[1] - x[0]) + k
+    res[1] = a * x[1] - b * x[0] + c
     return res
 
 def jac(x, t):

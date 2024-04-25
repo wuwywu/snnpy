@@ -24,15 +24,15 @@ def f(x, t):
     return res
 
 # MSE相关的矩阵
-def jac(x, t, gamma):
+def jac(x, t):
     """
     args:
         x (numpy.ndarray) : 状态变量
         t (float) : 运行时间
-        gamma (float) : 耦合强度与 Laplacian 矩阵的特征值的乘积
     return:
         res (numpy.ndarray) : MSF的雅可比矩阵
     """
+    gamma = 1   # 耦合强度与 Laplacian 矩阵的特征值的乘积(自行在外部设定)
     # f 相对于 x 的雅可比行列式。
     def Df(x, t):
         """
@@ -149,16 +149,15 @@ class ContinuousDS(DynamicalSystem):
         self.x = self.x + (self.dt / 6.) * (k1 + 2 * k2 + 2 * k3 + k4)
         self.t += self.dt
 
-    def next_LTM(self, W, gamma):
+    def next_LTM(self, W):
         '''
         使用 RK4 方法计算一个时间步后偏差向量的状态。
             Parameters:
                 W (numpy.ndarray): 偏差向量数组。
-                gamma (float) : 耦合强度与 Laplacian 矩阵的特征值的乘积
             Returns:
                 res (numpy.ndarray): 下一个时间步的偏差向量数组
         '''
-        jacobian = self.jac(self.x, self.t, gamma, **self.kwargs)
+        jacobian = self.jac(self.x, self.t, **self.kwargs)
         k1 = jacobian @ W
         k2 = jacobian @ (W + (self.dt / 2.) * k1)
         k3 = jacobian @ (W + (self.dt / 2.) * k2)
@@ -189,16 +188,15 @@ class DiscreteDS(DynamicalSystem):
         self.x = self.f(self.x, self.t, **self.kwargs)
         self.t += self.dt
 
-    def next_LTM(self, W, gamma):
+    def next_LTM(self, W):
         '''
         使用 RK4 方法计算一个时间步后偏差向量的状态。
             Parameters:
                 W (numpy.ndarray): 偏差向量数组。
-                gamma (float) : 耦合强度与 Laplacian 矩阵的特征值的乘积
             Returns:
                 res (numpy.ndarray): 下一个时间步的偏差向量数组
         '''
-        jacobian = self.jac(self.x, self.t, gamma, **self.kwargs)
+        jacobian = self.jac(self.x, self.t, **self.kwargs)
         res = jacobian @ W
         if (self.dim == 1):
             return np.array([res])
@@ -207,12 +205,11 @@ class DiscreteDS(DynamicalSystem):
 
 
 # 最大 1-Lyapunov characteristic exponents (LCE)
-def msf_mLCE(system: DynamicalSystem, gamma: float, n_forward: int, n_compute: int, keep:bool=False):
+def msf_mLCE(system: DynamicalSystem, n_forward: int, n_compute: int, keep:bool=False):
     '''
     Compute the maximal 1-LCE.
         Parameters:
             system (DynamicalSystem): Dynamical system for which we want to compute the mLCE.
-            gamma (float) : 耦合强度与 Laplacian 矩阵的特征值的乘积
             n_forward (int): Number of steps before starting the mLCE computation.
             n_compute (int): Number of steps to compute the mLCE, can be adjusted using keep_evolution.
             keep (bool): If True return a numpy array of dimension (n_compute,) containing the evolution of mLCE.
@@ -230,7 +227,7 @@ def msf_mLCE(system: DynamicalSystem, gamma: float, n_forward: int, n_compute: i
     if keep:
         history = np.zeros(n_compute)
         for i in range(1, n_compute + 1):
-            w = system.next_LTM(w, gamma)
+            w = system.next_LTM(w)
             system.forward(1, False)
             mLCE += np.log(np.linalg.norm(w))
             history[i - 1] = mLCE / (i * system.dt)
@@ -239,7 +236,7 @@ def msf_mLCE(system: DynamicalSystem, gamma: float, n_forward: int, n_compute: i
         return mLCE, history
     else:
         for _ in range(n_compute):
-            w = system.next_LTM(w, gamma)
+            w = system.next_LTM(w)
             system.forward(1, False)
             mLCE += np.log(np.linalg.norm(w))
             w = w / np.linalg.norm(w)
@@ -248,12 +245,11 @@ def msf_mLCE(system: DynamicalSystem, gamma: float, n_forward: int, n_compute: i
 
 
 # Lyapunov characteristic exponents (LCE)
-def msf_LCE(system : DynamicalSystem, gamma: float, n_forward : int, n_compute : int, p:int=None, keep:bool=False):
+def msf_LCE(system : DynamicalSystem, n_forward : int, n_compute : int, p:int=None, keep:bool=False):
     '''
     Compute LCE.
         Parameters:
             system (DynamicalSystem): Dynamical system for which we want to compute the LCE.
-            gamma (float) : 耦合强度与 Laplacian 矩阵的特征值的乘积
             n_forward (int): Number of steps before starting the LCE computation.
             n_compute (int): Number of steps to compute the LCE, can be adjusted using keep_evolution.
             p (int): Number of LCE to compute.
@@ -272,7 +268,7 @@ def msf_LCE(system : DynamicalSystem, gamma: float, n_forward : int, n_compute :
     if keep:
         history = np.zeros((n_compute, p))
         for i in range(1, n_compute + 1):
-            W = system.next_LTM(W, gamma)
+            W = system.next_LTM(W)
             system.forward(1, False)
             W, R = np.linalg.qr(W)
             for j in range(p):
@@ -282,7 +278,7 @@ def msf_LCE(system : DynamicalSystem, gamma: float, n_forward : int, n_compute :
         return LCE, history
     else:
         for _ in range(n_compute):
-            W = system.next_LTM(W, gamma)
+            W = system.next_LTM(W)
             system.forward(1, False)
             W, R = np.linalg.qr(W)
             for j in range(p):
@@ -303,30 +299,6 @@ if __name__ == "__main__":
     T_cal = int(1e6)
     gamma = 10
 
-    def f(x, t):
-        res = np.zeros_like(x)
-        res[0] = sigma * (x[1] - x[0])
-        res[1] = x[0] * (rho - x[2]) - x[1]
-        res[2] = x[0] * x[1] - beta * x[2]
-        return res
-
-    def jac(x, t, gamma):
-        def Df(x, t):
-            res = np.zeros((x.shape[0], x.shape[0]))
-            res[0, 0], res[0, 1] = -sigma, sigma
-            res[1, 0], res[1, 1], res[1, 2] = rho - x[2], -1., -x[0]
-            res[2, 0], res[2, 1], res[2, 2] = x[1], x[0], -beta
-            return res
-        def DH(x, t):
-            res = np.zeros((x.shape[0], x.shape[0]))
-            # res[0, 0] = 1   # 1-->1
-            # res[1, 0] = 1   # 1-->2
-            # res[0, 1] = 1   # 2-->1
-            res[2, 2] = 1   # 3-->3
-            return res
-        res = Df(x, t) - gamma * DH(x, t)
-        return res
-
     # Lorenz = ContinuousDS(x0, f, jac, dt)
 
     # 计算LCE
@@ -338,8 +310,34 @@ if __name__ == "__main__":
     gamma_list = np.arange(0.01, 100, .1)
     # 计算3->3
     for gamma in gamma_list:
+        def f(x, t):
+            res = np.zeros_like(x)
+            res[0] = sigma * (x[1] - x[0])
+            res[1] = x[0] * (rho - x[2]) - x[1]
+            res[2] = x[0] * x[1] - beta * x[2]
+            return res
+
+        def jac(x, t):
+            def Df(x, t):
+                res = np.zeros((x.shape[0], x.shape[0]))
+                res[0, 0], res[0, 1] = -sigma, sigma
+                res[1, 0], res[1, 1], res[1, 2] = rho - x[2], -1., -x[0]
+                res[2, 0], res[2, 1], res[2, 2] = x[1], x[0], -beta
+                return res
+
+            def DH(x, t):
+                res = np.zeros((x.shape[0], x.shape[0]))
+                # res[0, 0] = 1   # 1-->1
+                # res[1, 0] = 1   # 1-->2
+                # res[0, 1] = 1   # 2-->1
+                res[2, 2] = 1  # 3-->3
+                return res
+
+            res = Df(x, t) - gamma * DH(x, t)
+            return res
+
         Lorenz = ContinuousDS(x0, f, jac, dt)
-        LCE = msf_mLCE(Lorenz, gamma, T_init, T_cal, keep=False)
+        LCE = msf_mLCE(Lorenz, T_init, T_cal, keep=False)
         LCE_list.append(LCE)
 
 

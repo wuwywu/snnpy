@@ -11,6 +11,7 @@ from abc import ABC, abstractmethod
 import matplotlib.pyplot as plt
 
 # ẋ = f(x, t) 或 x_(n 1) = f(x_n) 的函数 f。
+# 同步状态方程演化
 def f(x, t):
     """
     args:
@@ -22,6 +23,7 @@ def f(x, t):
     res = np.zeros_like(x)
     return res
 
+# MSE相关的矩阵
 def jac(x, t, gamma):
     """
     args:

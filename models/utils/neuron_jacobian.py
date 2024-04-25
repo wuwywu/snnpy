@@ -159,7 +159,7 @@ def jac(x, t):
     b = 0.6  # 0.6 to 0.18 oscillations to aperiodic burst
     c = 0.28
     k = 0.03
-    res[0, 0] = (2 * x[0]) * np.exp(x[1] - x[0]) + (x[0]** 2) * np.exp(x[1] - x[0])
+    res[0, 0] = (2 * x[0]) * np.exp(x[1] - x[0]) - (x[0]** 2) * np.exp(x[1] - x[0])
     res[0, 1] = (x[0]** 2) * np.exp(x[1] - x[0])
     res[1, 0], res[1, 1] = -b, a
     return res

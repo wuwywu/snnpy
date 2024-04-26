@@ -160,7 +160,7 @@ class DiscreteDS:
         self.xnew = np.zeros_like(self.x[:, 0])
 
         # 微扰变量
-        self.delta_x = np.zeros((self.dim, N, self.dim * N))  # (dim, t, N)
+        self.delta_x = np.zeros((self.dim, self.N, self.dim * self.N))  # (dim, t, N)
         self.delta_x[:, 0, :] = 1
         # np.fill_diagonal(self.delta_x[:, 0, :], 1)  # 对于每个维度，设置初始微扰在第0个时间点的对角线为1
         self.delta_xnew = np.zeros_like(self.delta_x[:, 0, :])
@@ -176,7 +176,7 @@ class DiscreteDS:
 
     def next(self):
         '''
-        使用 Euler/rk4 方法计算一个时间步后系统的状态。
+        计算一个时间步后系统的状态。
         '''
         x_0 = self.x[:, 0]
         x_tau = self.x[:, -1]
@@ -185,7 +185,7 @@ class DiscreteDS:
 
     def next_delta_x(self):
         '''
-        使用 Euler/rk4 方法计算一个时间步后偏差的状态。
+        计算一个时间步后偏差的状态。
         '''
         x_0 = self.x[:, 0]
         x_tau = self.x[:, -1]

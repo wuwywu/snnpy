@@ -118,6 +118,7 @@ class Neurons:
         firing_endPlace = np.where((mem < self.th_down) & (self.flag == 1))  # 放电结束的位置
         self.flag[firing_endPlace] = 0  # 放电标志改为放电
 
+
 # ================================= 离散模型的基类 =================================
 class DiscreteDS:
     """
@@ -189,6 +190,96 @@ class DiscreteDS:
         #  -------------------- 放电结束 -------------------
         firing_endPlace = np.where((mem < self.th_down) & (self.flag == 1))  # 放电结束的位置
         self.flag[firing_endPlace] = 0  # 放电标志改为放电
+
+
+# ================================= 一般nodes的基类 =================================
+class Nodes:
+    """
+    N: 创建节点的数量
+    method ： 计算非线性微分方程的方法，（"eluer", "rk4"）
+    dt ： 计算步长
+
+    第一个状态变量都写为：mem
+    运行时间：t; 时间步长：dt
+    节点数量：num
+    """
+    def __init__(self, N, method="euler", dt=0.01):
+        self.num = N  # 神经元数量
+        if method == "euler":   self.method = self._euler
+        if method == "rk4":   self.method = self._rk4
+        self.dt = dt
+        self._fparams()
+        self._fvars()
+
+    def _fparams(self):
+        pass
+
+    def _fvars(self):
+        self.t = 0  # 运行时间
+
+    def _euler(self, models, I, *args):
+        """
+        使用 euler 算法计算非线性微分方程
+        arg:
+            models: 神经元模型函数，输入一个外部激励(所有激励合在一起)，返回所有dvars_dt
+            I: 外部激励，所有激励合在一起
+            *args： 输入所有变量，与dvars_dt一一对应
+            # 注意只有一个变量的时候，返回必须为 dvar_dt, “,"是必须的
+        """
+        vars = list(args)  # 所有的变量
+        dvars_dt = models(I)  # 所有变量的的微分方程
+        lens = len(dvars_dt)  # 变量的数量
+        for i in range(lens):  # 变量更新
+            vars[i] += dvars_dt[i] * self.dt
+
+    def _rk4(self, models, I, *args):
+        """
+        使用 fourth-order Runge-Kutta(rk4) 算法计算非线性微分方程
+        arg:
+            models: 神经元模型函数，输入一个外部激励(所有激励合在一起)，返回所有dvars_dt
+            I: 外部激励，所有激励合在一起
+            *args： 输入所有变量，与dvars_dt一一对应
+            # 注意只有一个变量的时候，返回必须为 dvar_dt, “,"是必须的
+        """
+        vars = list(args)  # 所有的变量
+        original_vars = copy.deepcopy(vars)  # 原始状态备份
+        lens = len(vars)  # 变量的数量
+        dt = self.dt  # 时间步长
+        # 计算k1
+        k1 = models(I)
+        # 计算k2
+        for i in range(lens):
+            vars[i] += original_vars[i] + 0.5 * dt * k1[i] - vars[i]
+        k2 = models(I)
+        # 计算k3
+        for i in range(lens):
+            vars[i] += original_vars[i] + 0.5 * dt * k2[i] - vars[i]
+        k3 = models(I)
+        # 计算k4
+        for i in range(lens):
+            vars[i] += original_vars[i] + dt * k3[i] - vars[i]
+        k4 = models(I)
+
+        # 最终更新vars
+        for i in range(lens):
+            vars[i] += original_vars[i] + dt * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]) / 6 - vars[i]
+
+    def __call__(self, Io=0, axis=[0]):
+        """
+        args:
+            Io: 输入到模型的外部激励，
+                shape:
+                    (len(axis), self.num)
+                    (self.num, )
+                    float
+            axis: 需要加上外部激励的维度
+                list
+        """
+        # I = np.zeros((self.N_vars, self.num))
+        # I[0, :] = self.Iex  # 恒定的外部激励
+        # I[axis, :] += Io
+
+        self.t += self.dt  # 时间前进
 
 
 # ================================= 突触模型的基类 =================================
@@ -302,3 +393,47 @@ class Synapse:
         """
         pass
 
+
+# ================================= 创建新模型的模板 =================================
+class Models(Nodes):
+    """
+    N: 创建节点的数量
+    method ： 计算非线性微分方程的方法，（"eluer", "rk4"）
+    dt ： 计算步长
+
+    第一个状态变量都写为：mem
+    运行时间：t; 时间步长：dt
+    节点数量：num
+    """
+    def __init__(self, N, method="euler", dt=0.01):
+        super().__init__(N, method=method, dt=dt)
+        # self.num = N  # 神经元数量
+        self._params()
+        self._vars()
+
+    def _params(self):
+        pass
+
+    def _vars(self):
+        pass
+
+    def _model(self, I):
+        pass
+
+    def __call__(self, Io=0, axis=[0]):
+        """
+        args:
+            Io: 输入到模型的外部激励，
+                shape:
+                    (len(axis), self.num)
+                    (self.num, )
+                    float
+            axis: 需要加上外部激励的维度
+                list
+        """
+
+        # I = np.zeros((self.N_vars, self.num))
+        # I[0, :] = self.Iex  # 恒定的外部激励
+        # I[axis, :] += Io
+
+        self.t += self.dt  # 时间前进

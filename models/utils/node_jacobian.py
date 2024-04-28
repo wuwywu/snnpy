@@ -2,7 +2,7 @@
 # Author    : WuY<wuyong@mails.ccnu.edu.com>
 # Datetime  : 2024/3/22
 # User      : WuY
-# File      : neuron_jacobian.py
+# File      : node_jacobian.py
 # 各种动力学系统，和其jacobian矩阵
 
 import numpy as np

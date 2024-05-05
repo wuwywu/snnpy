@@ -195,7 +195,7 @@ class multicompartment:
 
 
 if __name__ == "__main__":
-    N = 30
+    N = 1
     N_D = 3 # 树突的数量
 
     models = multicompartment(N, N_D)

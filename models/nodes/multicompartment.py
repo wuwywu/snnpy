@@ -20,13 +20,13 @@ from utils.utils import spikevent
 class multicompartment:
     """
     N : 建立神经元的数量
-    N_D : 树突的数量
+    N_D : 树突的数量(每个神经元)
     dt ： 计算步长
     神经元的膜电位都写为：mem
     """
     def __init__(self, N=1, N_D=1, dt=0.025):
         self.num = N  # 神经元数量
-        self.N_D = N_D # 树突的数量
+        self.N_D = N_D # 树突的数量(每个神经元)
         self.dt = dt  # 积分步长
         self._params()
         self._vars()
@@ -195,7 +195,7 @@ class multicompartment:
 
 
 if __name__ == "__main__":
-    N = 1
+    N = 30
     N_D = 3 # 树突的数量
 
     models = multicompartment(N, N_D)

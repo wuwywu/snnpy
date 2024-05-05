@@ -52,8 +52,8 @@ class multicompartment:
         self.refrac_time = 0             # absolute refractory time (total abs. refractory time = spike_width_dend+spike_latency+refrac_time) [ms]
         # 噪声相关
         self.Noise_tau = 20                   # time constant for the noise [ms]
-        self.Noise_avg = 0                    # mean of noise [pA] 35
-        self.Noise_std = 0                    # std of noise [pA] 3.5
+        self.Noise_avg = 150                  # mean of noise [pA] 35
+        self.Noise_std = 15                   # std of noise [pA] 3.5
 
     def _vars(self):
         self.t = 0  # 运行时间
@@ -195,8 +195,8 @@ class multicompartment:
 
 
 if __name__ == "__main__":
-    N = 30
-    N_D = 3 # 树突的数量
+    N = 40
+    N_D = 15 # 树突的数量
 
     models = multicompartment(N, N_D)
     models.Iex = 1200.0     # pA

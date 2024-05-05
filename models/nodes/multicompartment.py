@@ -124,7 +124,7 @@ class multicompartment:
 
     def __call__(self, I_soma_syn=0, I_prox_syn=0, I_dist_syn=0):
         """
-        I_soma_syn : 胞体受到的外界电流 [num, ]
+        I_soma_syn : 胞体受到的外界电流 [num, ] or float
         I_prox_syn : 近端受到的外界电流 [num, N_D] or float
         I_dist_syn : 远端受到的外界电流 [num, N_D] or float
         """

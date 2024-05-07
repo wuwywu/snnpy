@@ -36,9 +36,9 @@ class Neurons:
     def _fvars(self):
         self.t = 0  # 运行时间
         # 模型放电变量
-        self.flag = np.zeros(self.num, dtype=int)           # 模型放电标志
-        self.flaglaunch = np.zeros(self.num, dtype=int)     # 模型开始放电标志
-        self.firingTime = np.zeros(self.num)                # 记录放电时间
+        self.flag = np.zeros(self.num, dtype=int)           # 模型放电标志(>0, 放电)
+        self.flaglaunch = np.zeros(self.num, dtype=int)     # 模型开始放电标志(==1, 放电刚刚开始)
+        self.firingTime = np.zeros(self.num)                # 记录放电时间(上次放电)
 
     def _euler(self, models, I, *args):
         """

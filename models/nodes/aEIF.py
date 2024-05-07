@@ -22,12 +22,11 @@ from utils.utils import spikevent
 class aEIF(Neurons):
     """
     N : 建立神经元的数量
-    method ： 计算非线性微分方程的方法，（"euler", "rk4"）
     dt ： 计算步长
     神经元的膜电位都写为：mem
     """
-    def __init__(self, N=1, method="euler", dt=0.25):
-        super().__init__(N, method=method, dt=dt)
+    def __init__(self, N=1, dt=0.25):
+        super().__init__(N, dt=dt)
         self._params()
         self._vars()
 
@@ -47,7 +46,7 @@ class aEIF(Neurons):
         self.VT_jump = 20                       # adaptive threshold
 
         # 尖峰设置参数
-        self.th = 20                            # [mV] spike threshold
+        self.th_up = 20                            # [mV] spike threshold
 
         self.t = 0          # 运行时间
         self.Iex = 0        # 恒定的外部激励 [pA]
@@ -59,8 +58,6 @@ class aEIF(Neurons):
         self.w_tail = np.zeros(self.num)  # initial values
         self.V_T = -50.4 * np.ones(self.num)  # initial values
         self.N_vars = 4  # 变量的数量
-
-        self.counter = np.zeros(self.num, dtype=int)
 
     def __call__(self, Io=0, axis=[0]):
         """
@@ -88,58 +85,66 @@ class aEIF(Neurons):
                              * np.exp((self.mem - self.V_T) / self.Delta_T) - self.w + self.w_tail + I)
         self.dw_dt = 1 / self.tau_w * (self.a * (self.mem - self.E_L) - self.w)
 
-        self.mem = self.mem + dmem_dt * self.dt  # 膜电位u
-        self.w = self.w + self.dw_dt * self.dt  # hyperpolarizing adaptation current w_ad
-        self.w_tail = self.w_tail - self.w_tail * self.dt / self.tau_wtail  # additional current z
+        self.mem += dmem_dt * self.dt  # 膜电位u
+        self.w += self.dw_dt * self.dt  # hyperpolarizing adaptation current w_ad
+        self.w_tail -= self.w_tail * self.dt / self.tau_wtail  # additional current z
         self.V_T = (self.VT_rest * self.dt / self.tau_VT    \
                     + (1 - self.dt / self.tau_VT) * self.V_T)  # the adaptive threshold V_T
 
     def _spikes_eval(self, mem):
-        # 处理尖峰
-        spike_starts = np.where((mem > self.th) & (self.counter == 0))
-        self.mem[spike_starts] = 24.4  # 记录放电开始时间
-        self.counter[spike_starts] = 1
+        self.flaglaunch[:] = 0  # 重置放电开启标志
 
-        # 模拟尖峰持续2ms
+        # 处理尖峰
+        firing_StartPlace = np.where((mem > self.th_up) & (self.flag == 0))
+        self.mem[firing_StartPlace] = 24.4  # 记录放电开始时间
+        self.flag[firing_StartPlace] = 1
+
+        # 模拟尖峰持续 (t_spike) ms
         conut = self.t_spike / self.dt - 1
-        active_spikes = np.where((self.dt * self.counter < self.t_spike) & (self.counter > 0))
-        self.mem[active_spikes] = 32.862 - 8.462 * np.abs(round(conut/2) - self.counter[active_spikes]) / conut
+        active_spikes = np.where((self.dt * self.flag < self.t_spike) & (self.flag > 0))
+        self.mem[active_spikes] = 32.862 - 8.462 * np.abs(round(conut/2) - self.flag[active_spikes]) / conut
         self.w[active_spikes] -= self.dw_dt[active_spikes] * self.dt        # 保持w不变
-        self.counter[active_spikes] += 1
+        self.flag[active_spikes] += 1
 
         # 结束尖峰
-        end_spikes = np.where(self.dt * self.counter >= self.t_spike)
-        self.mem[end_spikes] = self.E_L + 15 + 6.0984  # about -49.5 mV
-        self.w[end_spikes] += self.b
-        self.w_tail[end_spikes] = self.w_jump
-        self.V_T[end_spikes] = self.VT_jump + self.VT_rest
-        self.counter[end_spikes] = 0
+        firing_endPlace = np.where(self.dt * self.flag >= self.t_spike)
+        self.mem[firing_endPlace] = self.E_L + 15 + 6.0984  # about -49.5 mV
+        self.w[firing_endPlace] += self.b
+        self.w_tail[firing_endPlace] = self.w_jump
+        self.V_T[firing_endPlace] = self.VT_jump + self.VT_rest
+        self.flag[firing_endPlace] = 0
+
+        self.flaglaunch[firing_StartPlace] = 1  # 放电开启标志
+        self.firingTime[firing_StartPlace] = self.t  # 记录放电时间
 
 
 if __name__ == "__main__":
     n = 2
     I_tot = 1000
 
-    nodes = aEIF(n)
+    dt = 0.01  # [ms] 时间步长
 
-    Tstep = 0.01  # [ms] 时间步长
+    nodes = aEIF(n, dt=dt)
+    nodes.t_spike = 2
+
     Tshop = 150  # 理论运行时间
-    Tn = int(Tshop / Tstep)  # 循环次数
+    Tn = int(Tshop / dt)  # 循环次数
     # 记录理论运行时间
 
     time = []
     mem = []
+    se = spikevent(n)
 
     for i in range(Tn):
         nodes(I_tot)
-
         time.append(nodes.t)
         mem.append(nodes.mem.copy())
+        se(nodes.t, nodes.flaglaunch)
 
-    # print(time.shape)
-    # print(mem.shape)
-
-    # plt.subplot(211)
+    ax1 = plt.subplot(211)
     plt.plot(time, mem)
+    plt.subplot(212, sharex=ax1)
+    se.pltspikes()
+    # print(se.Tspike_list)
 
     plt.show()

@@ -81,8 +81,10 @@ class LIF(Neurons):
 
     def _spikes_eval(self, mem):
         self.flaglaunch[:] = 0  # 重置放电开启标志
+        self.flag[:] = 0        # 重置处于放电标志
         firing_StartPlace = np.where(mem > self.threshold)
         self.flaglaunch[firing_StartPlace] = 1  # 放电开启标志
+        self.flag[firing_StartPlace] = 1        # 处于放电标志
         self.firingTime[firing_StartPlace] = self.t  # 记录放电时间
 
         self.mem[firing_StartPlace] = self.V_reset

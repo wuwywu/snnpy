@@ -35,6 +35,9 @@ class Neurons:
     """
     def __init__(self, N, method="euler", dt=0.01):
         self.num = N  # 神经元数量
+        method_options = ["eluer", "rk4"]
+        if method not in method_options:
+            raise ValueError(f"无效选择，method在{method_options}选择")
         if method == "euler":   self.method = self._euler
         if method == "rk4":   self.method = self._rk4
         self.dt = dt
@@ -217,6 +220,9 @@ class Nodes:
     """
     def __init__(self, N, method="euler", dt=0.01):
         self.num = N  # 神经元数量
+        method_options = ["eluer", "rk4"]
+        if method not in method_options:
+            raise ValueError(f"无效选择，method在{method_options}选择")
         if method == "euler":   self.method = self._euler
         if method == "rk4":   self.method = self._rk4
         self.dt = dt
@@ -312,6 +318,9 @@ class Synapse:
     method: 计算非线性微分方程的方法，（"eluer", "rk4"）
     """
     def __init__(self, pre, post, conn=None, synType="electr", method="euler"):
+        method_options = ["eluer", "rk4"]
+        if method not in method_options:
+            raise ValueError(f"无效选择，method在{method_options}选择")
         if method == "euler":   self.method = self._euler
         if method == "rk4":   self.method = self._rk4
         # 选择突触类型

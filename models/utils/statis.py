@@ -361,3 +361,37 @@ class cal_information:
 
         return MI
 
+
+# strength of incoherence (SI)不相干强度
+# SI = 1: 不同步状态；SI = 0: 同步状态；0<SI<1: chimera
+# references: R. Gopal, V.K. Chandrasekar, Phys. Rev. E 89 (2014) 052914. https://doi.org/10.1103/PhysRevE.89.052914.
+class strength_incoherence:
+    """
+    Tn : 计算次数(int), Time/dt
+    num : int 状态变量的数量
+    bin_size : int 每组状态变量的数量
+    thresh : 阈值(需要根据不同的模型进行选择)
+    """
+    def __init__(self, Tn, num, bin_size=4, thresh=5.0):
+        self.Tn = Tn  # 计算次数
+        self.n = num  # 状态变量的数量
+        self.bin_size = int(bin_size)  # 每组状态变量的数量
+        self.bins = int(num / bin_size)  # 分组数
+        self.thresh = thresh  # 阈值
+        self.theta = np.zeros(self.bins)
+
+    def __call__(self, v):
+        x = np.zeros_like(v)
+        x[:-1] = v[:-1] - v[1:]
+        x[-1] = v[-1] - v[0]
+        x_mean = x.mean()
+        x = x.reshape(-1, self.bin_size)
+
+        temp = ((x - x_mean) ** 2).mean(axis=1)
+        self.theta += np.sqrt(temp) / self.Tn
+
+    def return_SI(self):
+        sm = np.where(self.theta <= self.thresh, 1, 0)
+        SI = 1 - sm.mean()
+
+        return SI

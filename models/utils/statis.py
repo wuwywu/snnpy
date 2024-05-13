@@ -363,7 +363,7 @@ class cal_information:
 
 
 # strength of incoherence (SI)不相干强度
-# SI = 1: 不同步状态；SI = 0: 同步状态；0<SI<1: chimera
+# SI = 1: 不相干态；SI = 0: 相干态；0<SI<1: chimera
 # references: R. Gopal, V.K. Chandrasekar, Phys. Rev. E 89 (2014) 052914. https://doi.org/10.1103/PhysRevE.89.052914.
 class strength_incoherence:
     """
@@ -395,3 +395,4 @@ class strength_incoherence:
         SI = 1 - sm.mean()
 
         return SI
+

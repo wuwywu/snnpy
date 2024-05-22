@@ -26,7 +26,7 @@ import numpy as np
 class Neurons:
     """
     N: 创建神经元的数量
-    method ： 计算非线性微分方程的方法，（"eluer", "rk4"）
+    method ： 计算非线性微分方程的方法，（"euler", "rk4"）
     dt ： 计算步长
 
     神经元的膜电位都写为：mem
@@ -35,7 +35,7 @@ class Neurons:
     """
     def __init__(self, N, method="euler", dt=0.01):
         self.num = N  # 神经元数量
-        method_options = ["eluer", "rk4"]
+        method_options = ["euler", "rk4"]
         if method not in method_options:
             raise ValueError(f"无效选择，method在{method_options}选择")
         if method == "euler":   self.method = self._euler
@@ -211,7 +211,7 @@ class DiscreteDS:
 class Nodes:
     """
     N: 创建节点的数量
-    method ： 计算非线性微分方程的方法，（"eluer", "rk4"）
+    method ： 计算非线性微分方程的方法，（"euler", "rk4"）
     dt ： 计算步长
 
     第一个状态变量都写为：mem
@@ -220,7 +220,7 @@ class Nodes:
     """
     def __init__(self, N, method="euler", dt=0.01):
         self.num = N  # 神经元数量
-        method_options = ["eluer", "rk4"]
+        method_options = ["euler", "rk4"]
         if method not in method_options:
             raise ValueError(f"无效选择，method在{method_options}选择")
         if method == "euler":   self.method = self._euler
@@ -315,10 +315,10 @@ class Synapse:
     post: 网络后节点
     conn: 连接矩阵
     synType: 突触类型["electr", "chem"]
-    method: 计算非线性微分方程的方法，（"eluer", "rk4"）
+    method: 计算非线性微分方程的方法，（"euler", "rk4"）
     """
     def __init__(self, pre, post, conn=None, synType="electr", method="euler"):
-        method_options = ["eluer", "rk4"]
+        method_options = ["euler", "rk4"]
         if method not in method_options:
             raise ValueError(f"无效选择，method在{method_options}选择")
         if method == "euler":   self.method = self._euler
@@ -427,7 +427,7 @@ class Synapse:
 class Models(Nodes):
     """
     N: 创建节点的数量
-    method ： 计算非线性微分方程的方法，（"eluer", "rk4"）
+    method ： 计算非线性微分方程的方法，（"euler", "rk4"）
     dt ： 计算步长
 
     第一个状态变量都写为：mem

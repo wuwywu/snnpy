@@ -139,16 +139,18 @@ class plot_line:
 
 
 # 画误差阴影图
-def plot_errorFill(ax, x, y_mean, y_error, color="b", alpha=0.2, label=None):
+def plot_errorFill(ax, x, y_mean, y_error,
+                  linewidth=2.5, color="b", alpha=0.2, label=None):
     """
     ax      : 画图的轴体
     x       : x轴的数据
     y_mean  : y轴平均值数据
     y_error : y轴误差数据
+    linewidth  : 线的宽度
     color   : 颜色（默认蓝色）
     alpha   : 阴影的透明度
     """
-    ax.plot(x, y_mean, "-", color=color, label=label)
+    ax.plot(x, y_mean, "-", linewidth=linewidth, color=color, label=label)
     ax.fill_between(x, y_mean-y_error, y_mean+y_error, color=color, alpha=alpha)
 
 

@@ -342,8 +342,6 @@ class phase_shift:
         plt.xlim(self.T_spike_list[3], self.T_spike_list[6])
 
 
-
-
 if __name__ == "__main__":
     # ================== 测试 "相位漂移" 和 "相位响应曲线" 所使用的输入脉冲 ==================
     dt = 0.01

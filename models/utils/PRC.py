@@ -29,7 +29,8 @@ class syn_chem:
         dt : 算法的时间步长
         method : 计算非线性微分方程的方法，（"euler", "rk4")
     """
-    def __init__(self, tau_peak=0.5, dt=0.01, method="euler"):
+    def __init__(self, N=1, tau_peak=0.5, dt=0.01, method="euler"):
+        self.num = N  # 输入突触数量
         method_options = ["euler", "rk4"]
         if method not in method_options:
             raise ValueError(f"无效选择，method在{method_options}选择")
@@ -48,16 +49,20 @@ class syn_chem:
         self.g_syn = 0.1    # 突触的最大电导
 
     def vars(self):
-        self.q = np.zeros(1)
-        self.s = np.zeros(1)
+        self.q = np.zeros(self.num)
+        self.s = np.zeros(self.num)
 
     def reset(self):
         self.vars()
 
     def __call__(self, t, ts):
-        if np.abs(t - ts) < (0.5 * dt):
-            self.q[:] = 1
-            print(".")
+        """
+        args:
+            ts : list/numpy 所有峰放电的时间
+        """
+        ts = np.array(ts)
+        # if np.abs(t - ts) < (0.5 * self.dt):
+        self.q[np.abs(t - ts) < (0.5 * self.dt)] = 1
         self.method(self.syn_model, self.q, self.s)
 
         return self.q, self.s
@@ -133,7 +138,6 @@ class syn_chem:
         lens = len(dvars_dt)  # 变量的数量
         for i in range(lens):  # 变量更新
             vars[i] += dvars_dt[i] * self.dt
-        print(vars[0])
 
     def _rk4(self, models, *args):
         """
@@ -167,20 +171,206 @@ class syn_chem:
             vars[i] += original_vars[i] + dt * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]) / 6 - vars[i]
 
 
+class phase_shift:
+    """
+    这个代码，给出神经元的相位漂移
+    args:
+        node : （类）节点类
+        phase : list 刺激相位 range(0, 1)
+
+    输入脉冲被设置在第5个到第6个峰之间，代码定位到：_node_init
+        self.ts_list = self.in_phase*self.T + self.T_spike_list[4]
+    里面的重要参数：
+        T_spike_list  : 没有输入脉冲时，spikes的时间
+        T_spike_act_list : 有输入脉冲时，spikes的时间
+        ts_list :   给输入脉冲的时间
+        in_phase :  给输入脉冲的的相位
+        mem_no_in  :   没有输入脉冲时，膜电位的变化
+        mem_in :       有输入脉冲时，膜电位的变化
+    """
+    def __init__(self, nodes, phase=[0.5], method="euler"):
+        self.nodes = nodes                            # 输入节点
+        self.dt = self.nodes.dt
+        self.num = len(phase)
+        self.in_phase = np.array(phase)
+        self.syn_in = syn_chem(self.num, dt=self.dt, method=method)       # 实例化输入突触
+        self._params()
+        self._vars()
+        self._node_init()
+
+    def _params(self):
+        self.T_init =10000      # 初始化节点时间
+        self.e = 0.             # 化学突触的平衡电位
+        self.g_syn = 0.1        # 突触的最大电导
+
+        self.th_up = self.nodes.th_up  # 放电阈值
+        self.th_down = self.nodes.th_down  # 放电阈下值
+
+    def _vars(self):
+        # 放电变量
+        self.max_init = -np.inf                     # 初始最大值
+        self.max = -np.inf + np.zeros(self.num)     # 初始变化最大值
+        self.nn = np.zeros(self.num, dtype=int)            # 记录每个节点的ISI的个数
+        self.flag = np.zeros(self.num, dtype=int)          # 放电标志
+        self.T_pre = np.zeros(self.num)         # 前峰时间
+        self.T_post = np.zeros(self.num)        # 后峰时间
+
+    def __call__(self):
+        mem = self.nodes.mem
+        self.T_spike_act_list = np.zeros((self.num, 10))  # 记录刺激后的峰
+
+        t_final = 5000  # 最大初始时间
+        self.mem_in = []
+        self.I_in = []
+        while self.nn.min() < 8 and self.nodes.t < t_final / self.dt:
+            t = self.nodes.t
+            q, s = self.syn_in(t, self.ts_list)
+            I = self.g_syn * s * (self.e - mem)
+            self.I_in.append(I.copy())
+            self.nodes(I)
+            self._spikes_eval(self.nodes.mem)  # 放电测算
+
+            self.mem_in.append(self.nodes.mem.copy())
+
+        self.mem_in= np.array(self.mem_in)
+
+    def _node_init(self):
+        """
+        这个函数的作用是：
+            1、重置节点初始值（所有节点初始值都设定为一样）
+            2、重置节点数量
+            3、重置节点运行时间
+            4、给出节点的振荡周期
+            5、通过相位给出输入脉冲刺激的时间
+        """
+        # 初始化节点
+        for i in range(self.T_init):
+            self.nodes()
+        # 记录初始值，重置时间
+        self.nodes.t = 0.       # 初始化运行时间
+        vars_init = np.array(self.nodes.retuen_vars())[:, 0]  # 设定变量初始值
+
+        # ================================== 记录没有输入脉冲时峰值时间 ==================================
+        mem = self.nodes.mem
+        th_up = self.th_up        # 放电阈值
+        th_down = self.th_down    # 放电阈下值
+        max_init = -np.inf              # 初始最大值（负无穷大）
+        max = -np.inf + np.zeros(1)     # 初始变化最大值（负无穷大）
+        nn = np.zeros(1)                # 记录每个节点的ISI的个数
+        flag = np.zeros(1)              # 放电标志
+        T_pre = np.zeros(1)             # 前峰时间
+        T_post = np.zeros(1)            # 后峰时间
+
+        self.T_spike_list = []               # 记录峰的时间
+
+        t_final = 5000                  # 最大初始时间
+        ISI_list = []
+        self.mem_no_in = []
+        while nn[0]<10 and self.nodes.t<t_final/self.dt:
+            # 运行节点
+            self.nodes()
+            self.mem_no_in.append(self.nodes.mem[0])
+
+            t = self.nodes.t
+            # -------------------- 放电开始 --------------------
+            firing_StartPlace = np.where((mem > th_up) & (flag == 0))  # 放电开始的位置
+            flag[firing_StartPlace] = 1  # 放电标志改为放电
+            # -------------------- 放电期间 --------------------
+            firing_Place = np.where((mem > max) & (flag == 1))         # 放电期间并且还没有到达峰值
+            max[firing_Place] = mem[firing_Place]
+            T_post[firing_Place] = t                                   # 存储前面峰的时间
+            # -------------------- 放电结束 --------------------
+            firing_endPlace = np.where((mem < th_down) & (flag == 1))  # 放电结束的位置
+            firing_endPlace2 = np.where((mem < th_down) & (flag == 1) & (nn > 2))  # 放电结束的位置2
+            flag[firing_endPlace] = 0  # 放电标志改为放电
+            nn[firing_endPlace] += 1  # 结束放电ISI数量+1
+
+            ISI = T_post[firing_endPlace2] - T_pre[firing_endPlace2]        # ISI（峰峰间隔，周期）
+            ISI_list.extend(ISI)
+
+            T_pre[firing_endPlace] = T_post[firing_endPlace]
+            self.T_spike_list.extend(T_post[firing_endPlace])
+
+            max[firing_endPlace] = max_init
+
+        # 初始化 `节点初始值`，`初始时间` 和 `节点数量`；给出振荡周期
+        self.nodes.num = self.num
+        self.nodes._fvars()
+        self.nodes.set_vars_vals(vars_vals=vars_init)
+        self.nodes.t = 0.  # 初始化运行时间
+
+        self.T = ISI_list[-1]
+
+        # 通过相位给给出 `输入脉冲` 时间(第5个峰后添加，可以修改)
+        self.ts_list = self.in_phase*self.T + self.T_spike_list[4]
+
+    def _spikes_eval(self, mem):
+        """
+        测试放电
+        """
+        # -------------------- 放电开始 --------------------
+        firing_StartPlace = np.where((mem > self.th_up) & (self.flag == 0))  # 放电开始的位置
+        self.flag[firing_StartPlace] = 1  # 放电标志改为放电
+        # -------------------- 放电期间 --------------------
+        firing_Place = np.where((mem > self.max) & (self.flag == 1))  # 放电期间并且还没有到达峰值
+        self.max[firing_Place] = mem[firing_Place]
+        self.T_post[firing_Place] = self.nodes.t
+        #  -------------------- 放电结束 -------------------
+        firing_endPlace = np.where((mem < self.th_down) & (self.flag == 1))  # 放电结束的位置
+        firing_endPlace2 = np.where((mem < self.th_down) & (self.flag == 1) & (self.nn > 2))  # 放电结束的位置2
+        self.flag[firing_endPlace] = 0  # 放电标志改为放电
+        self.nn[firing_endPlace] += 1  # 结束放电ISI数量+1
+
+        self.T_pre[firing_endPlace] = self.T_post[firing_endPlace]
+        if firing_endPlace[0].size != 0:
+            # 给出放电的坐标
+            coordinates = np.stack((firing_endPlace[0], self.nn[firing_endPlace]-1), axis=-1)
+            # print(firing_endPlace[0])
+            self.T_spike_act_list[coordinates[:, 0], coordinates[:, 1]] = self.T_post[firing_endPlace]
+
+        self.max[firing_endPlace] = self.max_init
+
+    def plot_phase_shift(self):
+        x_l = self.mem_in.shape[0]
+        x_ = np.arange(x_l)*self.dt
+        fig, axs = plt.subplots(self.num, sharex="all", layout='constrained')
+        for i in range(self.num):
+            axs[i].plot(x_, self.mem_in[:, i])
+            axs[i].plot(x_, self.mem_no_in[:x_l], color="r")
+            axs[i].axvline(self.ts_list[i], color='k', linestyle='--', lw=2)
+
+        plt.xlim(self.T_spike_list[3], self.T_spike_list[6])
+
+
+
+
 if __name__ == "__main__":
+    # ================== 测试 "相位漂移" 和 "相位响应曲线" 所使用的输入脉冲 ==================
     dt = 0.01
-    syn = syn_chem(dt=dt)
+    syn_test = syn_chem(2, dt=dt)
     # print(syn.tau_d_q)
     s_list = []
+    s1_list = []
 
     n = 700
-    t_list = np.arange(0, n*dt, 0.01)
+    t_list = np.arange(0, n * dt, 0.01)
     for i in range(n):
         t = i * dt
-        syn(t, ts=0.5)
-        s_list.append(syn.s[0])
+        syn_test(t, ts=[0.5, 1.])
+        s_list.append(syn_test.s[0])
+        s1_list.append(syn_test.s[1])
 
-    plt.plot(t_list, s_list)
+    fig, axs = plt.subplots(2, sharex="all", layout='constrained')
+    axs[0].plot(t_list, s_list)
+    axs[1].plot(t_list, s1_list)
+
+    # ================== 测试 "相位漂移" ==================
+    from nodes.HH import HH
+    node = HH()
+    phi_shift = phase_shift(node, phase=[0.4, 0.6])
+    phi_shift.g_syn = 0.2
+    phi_shift()
+    phi_shift.plot_phase_shift()
     plt.show()
 
 

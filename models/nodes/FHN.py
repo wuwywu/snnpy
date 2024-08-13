@@ -13,7 +13,7 @@ import copy
 import numpy as np
 import matplotlib.pyplot as plt
 from base_Mod import Neurons
-from utils.utils import spikevent
+from utils.utils_f import spikevent
 
 # seed = 0
 # np.random.seed(seed)                # 给numpy设置随机种子

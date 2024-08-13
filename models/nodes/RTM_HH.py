@@ -17,7 +17,7 @@ import copy
 import numpy as np
 import matplotlib.pyplot as plt
 from base_Mod import Neurons
-from utils.utils import spikevent
+from utils.utils_f import spikevent
 
 class RTM_HH(Neurons):
     """

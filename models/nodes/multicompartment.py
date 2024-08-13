@@ -14,7 +14,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import copy
 import numpy as np
 import matplotlib.pyplot as plt
-from utils.utils import spikevent
+from utils.utils_f import spikevent
 
 
 class multicompartment:

@@ -77,7 +77,7 @@ class FHN(Neurons):
         """
         return [self.mem, self.y]
 
-    def set_vars_vals(self, vars_vals=[0, 0, 0]):
+    def set_vars_vals(self, vars_vals=[0, 0]):
         """
         用于自定义所有状态变量的值
         """

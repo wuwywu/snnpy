@@ -92,6 +92,19 @@ class ML(Neurons):
 
         self.t += self.dt  # Time step forward
 
+    def retuen_vars(self):
+        """
+        用于输出所有状态变量
+        """
+        return [self.mem, self.W]
+
+    def set_vars_vals(self, vars_vals=[0, 0, 0]):
+        """
+        用于自定义所有状态变量的值
+        """
+        self.mem = vars_vals[0]*np.ones(self.num)
+        self.W = vars_vals[1]*np.ones(self.num)
+
 
 if __name__ == "__main__":
     N = 2

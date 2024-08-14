@@ -97,6 +97,20 @@ class WB_Inh(Neurons):
 
         self.t += self.dt  # 时间前进
 
+    def retuen_vars(self):
+        """
+        用于输出所有状态变量
+        """
+        return [self.mem, self.n, self.h]
+
+    def set_vars_vals(self, vars_vals=[0, 0, 0]):
+        """
+        用于自定义所有状态变量的值
+        """
+        self.mem = vars_vals[0] * np.ones(self.num)
+        self.n = vars_vals[1] * np.ones(self.num)
+        self.h = vars_vals[2] * np.ones(self.num)
+
 
 if __name__ == "__main__":
     N = 2

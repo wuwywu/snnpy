@@ -71,6 +71,19 @@ class FHN(Neurons):
 
         self.t += self.dt  # 时间前进
 
+    def retuen_vars(self):
+        """
+        用于输出所有状态变量
+        """
+        return [self.mem, self.y]
+
+    def set_vars_vals(self, vars_vals=[0, 0, 0]):
+        """
+        用于自定义所有状态变量的值
+        """
+        self.mem = vars_vals[0]*np.ones(self.num)
+        self.y = vars_vals[1]*np.ones(self.num)
+
 
 class FHN2(Neurons):
     """

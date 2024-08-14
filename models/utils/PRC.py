@@ -8,11 +8,16 @@
 # Springer International Publishing, Cham, 2017.
 # https://doi.org/10.1007/978-3-319-51171-9.
 # 描述 : 这个代码用于测量神经元的 "相位漂移" 和 "相位响应曲线"
+# 包含了两个工具：
+#           1、phase_shift : 相位漂移
+#           2、Phase_Response_Curves : 相位响应曲线
+# 使用方法，1、代码下面；2、测试文件中，test_prc.ipynb
 
 import os
 import sys
 sys.path.append(os.path.dirname(__file__))  # 将文件所在地址放入系统调用地址中
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+import copy
 import numpy as np
 import matplotlib.pyplot as plt
 from numba import jit, prange
@@ -234,6 +239,17 @@ class phase_shift:
 
         self.mem_in= np.array(self.mem_in)
 
+        return self.return_PRC()
+
+    def return_PRC(self):
+        T = self.T                  # 周期
+        in_phase = self.in_phase    # 刺激的相位（在第5和6峰之间）
+        T_spike_act_list = self.T_spike_act_list[:, 5]  # 第6个峰的时间
+        ts_list = self.ts_list      # 输入脉冲的时间
+        self.PRC = 1 - in_phase - (T_spike_act_list - ts_list) / T
+
+        return self.PRC
+
     def _node_init(self):
         """
         这个函数的作用是：
@@ -398,6 +414,17 @@ class Phase_Response_Curves:
             self.nodes(I)
             self._spikes_eval(self.nodes.mem)  # 放电测算
 
+        return self.return_PRC()
+
+    def return_PRC(self):
+        T = self.T                  # 周期
+        in_phase = self.in_phase    # 刺激的相位（在第5和6峰之间）
+        T_spike_act_list = self.T_spike_act_list[:, 5]  # 第6个峰的时间
+        ts_list = self.ts_list      # 输入脉冲的时间
+        self.PRC = 1 - in_phase - (T_spike_act_list - ts_list) / T
+
+        return self.PRC
+
     def _node_init(self):
         """
         这个函数的作用是：
@@ -492,15 +519,6 @@ class Phase_Response_Curves:
 
         self.max[firing_endPlace] = self.max_init
 
-    def return_PRC(self):
-        T = self.T                  # 周期
-        in_phase = self.in_phase    # 刺激的相位（在第5和6峰之间）
-        T_spike_act_list = self.T_spike_act_list[:, 5]  # 第6个峰的时间
-        ts_list = self.ts_list      # 输入脉冲的时间
-        self.PRC = 1 - in_phase - (T_spike_act_list - ts_list) / T
-
-        return self.PRC
-
     def plot_PRC(self):
         fig, axs = plt.subplots(1, layout='constrained')
         axs.plot(self.in_phase, self.PRC)
@@ -531,8 +549,10 @@ if __name__ == "__main__":
     node = HH()
     phi_shift = phase_shift(node, phase=[0.4, 0.6])
     phi_shift.g_syn = 0.2
-    phi_shift()
+    prc = phi_shift()
     phi_shift.plot_phase_shift()
+    fig = plt.gcf()
+    fig.suptitle("phase shift(HH)")
 
     from nodes.RTM_HH import RTM_HH
     node = RTM_HH()
@@ -540,23 +560,54 @@ if __name__ == "__main__":
     # phi_shift = phase_shift(node, phase=[0.1, 0.2, 0.3, 0.4, 0.6])
     phi_shift = phase_shift(node, phase=[0.1, 0.6])
     phi_shift.g_syn = 0.1
-    phi_shift()
+    prc = phi_shift()
     phi_shift.plot_phase_shift()
+    fig = plt.gcf()
+    fig.suptitle("phase shift(RTM_HH)")
 
-    # ================== 测试 "相位漂移" ==================
+    from nodes.WB_Inh import WB_Inh
+    g_syn = 0.1
+    node = WB_Inh()
+    node.Iex = 0.3
+    # phi_shift = phase_shift(node, phase=[0.1, 0.2, 0.3, 0.4, 0.6])
+    phi_shift = phase_shift(node, phase=[0.2, 0.6])
+    phi_shift.g_syn = g_syn
+    prc = phi_shift()
+    phi_shift.plot_phase_shift()
+    fig = plt.gcf()
+    fig.suptitle("phase shift(WB_Inh)")
+
+    # ================== 测试 "相位响应曲线" ==================
     node = HH()
     PRCer = Phase_Response_Curves(node)
     PRCer.g_syn = 0.2
-    PRCer()
-    prc = PRCer.return_PRC()
+    prc = PRCer()
+    # prc = PRCer.return_PRC()
     PRCer.plot_PRC()
+    fig = plt.gcf()
+    fig.suptitle("Phase Response Curves(HH)")
 
     node = RTM_HH()
     node.Iex = 0.3
     PRCer = Phase_Response_Curves(node)
     PRCer.g_syn = 0.1
-    PRCer()
-    prc = PRCer.return_PRC()
+    prc = PRCer()
+    # prc = PRCer.return_PRC()
     PRCer.plot_PRC()
+    fig = plt.gcf()
+    fig.suptitle("Phase Response Curves(RTM_HH)")
+
+    method = "euler"  # （"euler", "rk4"）
+    node = WB_Inh(method=method)
+    node.Iex = 0.3
+    PRCer = Phase_Response_Curves(node, method=method)
+    PRCer.g_syn = g_syn
+    prc = PRCer()
+    # prc = PRCer.return_PRC()
+    PRCer.plot_PRC()
+    fig = plt.gcf()
+    fig.suptitle("Phase Response Curves(WB_Inh)")
+    ax = fig.gca()
+    ax.plot(PRCer.in_phase, 1 - PRCer.in_phase, linestyle='--')
 
     plt.show()

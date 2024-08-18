@@ -114,7 +114,7 @@ def jac(x, t):
 
 
 # ====================== chaos ======================
-# lorenz系统
+# lorenz 系统
 def lorenz(x, t):
     res = np.zeros_like(x)
     # 常数
@@ -139,6 +139,30 @@ def jac(x, t):
     res[2, 0], res[2, 1], res[2, 2] = x[1], x[0], -BETA
     return res
 
+# Rossler 系统
+def Rossler(x, t):
+    res = np.zeros_like(x)
+    # 常数
+    alpha = 0.2
+    beta = 0.2
+    gamma = 9.
+    # 输出函数变量
+    res[0] = -x[1] - x[2]
+    res[1] = x[0] + alpha * x[1]
+    res[2] = beta + (x[0] - gamma)*x[2]
+    return res
+
+def jac(x, t):
+    res = np.zeros((x.shape[0], x.shape[0]))
+    # 常数
+    alpha = 0.2
+    beta = 0.2
+    gamma = 9.
+    # 输出函数变量
+    res[0, 0], res[0, 1], res[0, 2] = 0, -1, -1
+    res[1, 0], res[1, 1], res[1, 2] = 1, alpha, 0
+    res[2, 0], res[2, 1], res[2, 2] = x[2], 0, x[0] - gamma
+    return res
 
 # ====================== map models ======================
 def Chialvo(x, t):

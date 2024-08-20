@@ -28,6 +28,7 @@ def tohilbert(signal, time=None):
 
     # 计算相位
     phase = np.angle(analytic_signal)
+    phase = (phase + np.pi) / (2*np.pi)
 
     # 计算瞬时频率
     if time is not None:
@@ -39,10 +40,10 @@ def tohilbert(signal, time=None):
 if __name__ == "__main__":
     # 生成多个示例信号
     t = np.linspace(0, 10, 1000)
-    # signal1 = np.sin(2 * np.pi * 2 * t)
-    # signal2 = np.cos(2 * np.pi * 3 * t)
-    signal1 = np.sin(2 * np.pi * 2 * t) + 0.5 * np.sin(2 * np.pi * 5 * t)
-    signal2 = np.cos(2 * np.pi * 3 * t) + 0.3 * np.cos(2 * np.pi * 4 * t)
+    signal1 = np.sin(2 * np.pi * 2 * t)
+    signal2 = np.cos(2 * np.pi * 3 * t)
+    # signal1 = np.sin(2 * np.pi * 2 * t) + 0.5 * np.sin(2 * np.pi * 5 * t)
+    # signal2 = np.cos(2 * np.pi * 3 * t) + 0.3 * np.cos(2 * np.pi * 4 * t)
 
     signals = np.array([signal1, signal2])
 

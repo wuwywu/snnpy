@@ -49,7 +49,7 @@ def calculate_complete_phases(phases):
     complete_phases.append(phases[0] * 2 * np.pi)
     for i in range(1, len(phases)):
         diff = phases[i] - phases[i - 1]
-        if diff < 0:
+        if diff < -0.9:
             diff += 1
         complete_phase = complete_phases[i - 1] + diff * 2 * np.pi
         complete_phases.append(complete_phase)
@@ -59,10 +59,10 @@ def calculate_complete_phases(phases):
 if __name__ == "__main__":
     # 生成多个示例信号
     t = np.linspace(0, 10, 1000)
-    signal1 = np.sin(2 * np.pi * 2 * t)
-    signal2 = np.cos(2 * np.pi * 3 * t)
-    # signal1 = np.sin(2 * np.pi * 2 * t) + 0.5 * np.sin(2 * np.pi * 5 * t)
-    # signal2 = np.cos(2 * np.pi * 3 * t) + 0.3 * np.cos(2 * np.pi * 4 * t)
+    # signal1 = np.sin(2 * np.pi * 2 * t)
+    # signal2 = np.cos(2 * np.pi * 3 * t)
+    signal1 = np.sin(2 * np.pi * 2 * t) + 0.5 * np.sin(2 * np.pi * 5 * t)
+    signal2 = np.cos(2 * np.pi * 3 * t) + 0.3 * np.cos(2 * np.pi * 4 * t)
 
     signals = np.array([signal1, signal2])
 

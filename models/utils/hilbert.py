@@ -37,6 +37,25 @@ def tohilbert(signal, time=None):
 
     return amplitude, phase, instantaneous_frequency
 
+
+def calculate_complete_phases(phases):
+    """
+    计算完整的相位变化：
+        2*pi*N + phase(0-1)
+    注意：
+        希尔伯特变换求出相位后，将首尾的误差去掉，截取中间的有效部分
+    """
+    complete_phases = []
+    complete_phases.append(phases[0] * 2 * np.pi)
+    for i in range(1, len(phases)):
+        diff = phases[i] - phases[i - 1]
+        if diff < 0:
+            diff += 1
+        complete_phase = complete_phases[i - 1] + diff * 2 * np.pi
+        complete_phases.append(complete_phase)
+    return np.array(complete_phases)
+
+
 if __name__ == "__main__":
     # 生成多个示例信号
     t = np.linspace(0, 10, 1000)

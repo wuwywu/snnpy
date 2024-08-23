@@ -374,6 +374,18 @@ def ADJ(CLV : list):
 
 
 # ==================================== 用于 numba 并行运算的函数代码 ====================================
+# 注意：
+#     *args : 为 f 和 jac 需要修改的量
+@njit
+def f(x, t, *args):
+    res = np.zeros_like(x)
+    return res
+
+@njit
+def jac(x, t, *args):
+    res = np.zeros((x.shape[0], x.shape[0]))
+    return res
+
 @njit
 def rk4_step(x, t, dt, f, *args):
     k1 = f(x, t, *args)
@@ -382,8 +394,19 @@ def rk4_step(x, t, dt, f, *args):
     k4 = f(x + dt * k3, t + dt, *args)
     return x + (dt / 6.) * (k1 + 2 * k2 + 2 * k3 + k4)
 
+# ============= 主要函数 =============
 @njit
 def mLCE_jit(x0, f, jac, n_forward, n_compute, dt, *args):
+    """
+    Parameters:
+        x0 (numpy.ndarray)：初始条件。
+        f（function）: ẋ = f(x, t) 或 x_(n 1) = f(x_n) 的函数 f。
+        jac（function）: f 相对于 x 的雅可比行列式。
+        n_forward (int): Number of steps before starting the mLCE computation.
+        n_compute (int): Number of steps to compute the mLCE, can be adjusted using keep_evolution.
+        dt（float）: 两个时间步之间的时间间隔。
+        *args :  f 和 jac 需要修改的量
+    """
     t = 0
     x = x0
     dim = len(x0)
@@ -481,7 +504,7 @@ if __name__ == "__main__":
 
     sigma_list = np.arange(0, 10, 0.01)
     @njit(parallel=True)
-    def  parallel_mLCE(sigma_list, x0, f, jac, T_init, T_cal, dt, *args):
+    def parallel_mLCE(sigma_list, x0, f, jac, T_init, T_cal, dt, *args):
         n = len(sigma_list)
         mLCE_values = np.zeros(n)
         for i in prange(n):
@@ -489,5 +512,13 @@ if __name__ == "__main__":
             mLCE_values[i] = mLCE_jit(x0, f, jac, T_init, T_cal, dt, sigma, *args)
 
         # print(mLCE_values)
+        return mLCE_values
 
-    parallel_mLCE(sigma_list, x0, f, jac, T_init, T_cal, dt, rho, beta)
+    mLCE_values = parallel_mLCE(sigma_list, x0, f, jac, T_init, T_cal, dt, rho, beta)
+
+    # Plot of LCE
+    plt.figure(figsize=(6, 4))
+    plt.plot(sigma_list, mLCE_values)
+    plt.ylabel("LCE")
+    plt.xlabel("$\sigma$")
+    plt.show()

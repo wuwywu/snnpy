@@ -11,6 +11,7 @@ import copy
 import numpy as np
 from abc import ABC, abstractmethod
 import matplotlib.pyplot as plt
+from numba import njit, prange
 
 # ẋ = f(x, t) 或 x_(n 1) = f(x_n) 的函数 f。
 def f(x, t):
@@ -372,6 +373,51 @@ def ADJ(CLV : list):
     return ADJ
 
 
+# ==================================== 用于 numba 并行运算的函数代码 ====================================
+@njit
+def rk4_step(x, t, dt, f, *args):
+    k1 = f(x, t, *args)
+    k2 = f(x + (dt / 2.) * k1, t + (dt / 2.), *args)
+    k3 = f(x + (dt / 2.) * k2, t + (dt / 2.), *args)
+    k4 = f(x + dt * k3, t + dt, *args)
+    return x + (dt / 6.) * (k1 + 2 * k2 + 2 * k3 + k4)
+
+@njit
+def mLCE_jit(x0, f, jac, n_forward, n_compute, dt, *args):
+    t = 0
+    x = x0
+    dim = len(x0)
+    # 初始化
+    for _ in range(n_forward):
+        x = rk4_step(x, t, dt, f, *args)
+        t += dt
+
+    # Compute the mLCE
+    mLCE = 0.
+    W = np.random.rand(dim)
+    W = W / np.linalg.norm(W)
+
+    for _ in range(n_compute):
+        # w = system.next_LTM(w)
+        jacobian = jac(x, t, *args)
+        k1 = jacobian @ W
+        k2 = jacobian @ (W + (dt / 2.) * k1)
+        k3 = jacobian @ (W + (dt / 2.) * k2)
+        k4 = jacobian @ (W + dt * k3)
+        W = W + (dt / 6.) * (k1 + 2 * k2 + 2 * k3 + k4)
+
+        # system.forward(1, False)
+        x = rk4_step(x, t, dt, f, *args)
+        t += dt
+
+        mLCE += np.log(np.linalg.norm(W))
+        W = W / np.linalg.norm(W)
+
+    mLCE = mLCE / (n_compute * dt)
+
+    return mLCE
+
+
 if __name__ == "__main__":
     # 连续动力系统的定义，此处为 Lorenz63
     sigma = 10.
@@ -383,29 +429,65 @@ if __name__ == "__main__":
     T_init = int(1e6)
     T_cal = int(1e6)
 
-    def f(x, t):
+    # def f(x, t):
+    #     res = np.zeros_like(x)
+    #     res[0] = sigma * (x[1] - x[0])
+    #     res[1] = x[0] * (rho - x[2]) - x[1]
+    #     res[2] = x[0] * x[1] - beta * x[2]
+    #     return res
+    #
+    # def jac(x, t):
+    #     res = np.zeros((x.shape[0], x.shape[0]))
+    #     res[0, 0], res[0, 1] = -sigma, sigma
+    #     res[1, 0], res[1, 1], res[1, 2] = rho - x[2], -1., -x[0]
+    #     res[2, 0], res[2, 1], res[2, 2] = x[1], x[0], -beta
+    #     return res
+    #
+    # Lorenz63 = ContinuousDS(x0, f, jac, dt)
+
+    # 计算LCE
+    # LCE, history = LCE(Lorenz63, T_init, T_cal, keep=True)
+    # LCE = mLCE(Lorenz63, T_init, T_cal, keep=False)
+    # print(LCE)
+
+    # Plot of LCE
+    # plt.figure(figsize=(10, 6))
+    # plt.plot(history[:5000])
+    # plt.xlabel("Number of time steps")
+    # plt.ylabel("LCE")
+    # plt.title("Evolution of the LCE for the first 5000 time steps")
+    # plt.show()
+
+
+    # 测试并行运算
+    @njit
+    def f(x, t, sigma, rho, beta):
         res = np.zeros_like(x)
         res[0] = sigma * (x[1] - x[0])
         res[1] = x[0] * (rho - x[2]) - x[1]
         res[2] = x[0] * x[1] - beta * x[2]
         return res
 
-    def jac(x, t):
+    @njit
+    def jac(x, t, sigma, rho, beta):
         res = np.zeros((x.shape[0], x.shape[0]))
         res[0, 0], res[0, 1] = -sigma, sigma
         res[1, 0], res[1, 1], res[1, 2] = rho - x[2], -1., -x[0]
         res[2, 0], res[2, 1], res[2, 2] = x[1], x[0], -beta
         return res
 
-    Lorenz63 = ContinuousDS(x0, f, jac, dt)
+    # mLCE = mLCE_jit(x0, f, jac, T_init, T_cal, dt, sigma, rho, beta)
+    # print(mLCE)
 
-    # 计算LCE
-    LCE, history = LCE(Lorenz63, T_init, T_cal, keep=True)
+    sigma_list = np.arange(0, 10, 0.01)
+    @njit(parallel=True)
+    def  parallel_mLCE(sigma_list, x0, f, jac, T_init, T_cal, dt, *args):
+        n = len(sigma_list)
+        mLCE_values = np.zeros(n)
+        for i in prange(n):
+            sigma = sigma_list[i]
+            mLCE_values[i] = mLCE_jit(x0, f, jac, T_init, T_cal, dt, sigma, *args)
 
-    # Plot of LCE
-    plt.figure(figsize=(10, 6))
-    plt.plot(history[:5000])
-    plt.xlabel("Number of time steps")
-    plt.ylabel("LCE")
-    plt.title("Evolution of the LCE for the first 5000 time steps")
-    plt.show()
+        # print(mLCE_values)
+
+    parallel_mLCE(sigma_list, x0, f, jac, T_init, T_cal, dt, rho, beta)

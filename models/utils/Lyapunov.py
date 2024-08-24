@@ -557,7 +557,7 @@ if __name__ == "__main__":
     # LCE = LCE_jit(x0, f, jac, T_init, T_cal, dt, None, sigma, rho, beta)
     # print(LCE)
 
-    sigma_list = np.arange(0, 10, .1)
+    sigma_list = np.arange(0, 10, .01)
     # @njit(parallel=True)
     # def parallel_mLCE(sigma_list, x0, f, jac, T_init, T_cal, dt, *args):
     #     n = len(sigma_list)

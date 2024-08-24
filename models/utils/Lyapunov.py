@@ -445,7 +445,7 @@ def mLCE_jit(x0, f, jac, n_forward, n_compute, dt, *args):
 
 
 @njit
-def LCE_jit(x0, f, jac, n_forward, n_compute, dt, p, *args):
+def LCE_jit(x0, f, jac, n_forward, n_compute, dt, p=None, *args):
     """
     Parameters:
         x0 (numpy.ndarray)：初始条件。

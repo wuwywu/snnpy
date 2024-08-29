@@ -127,6 +127,117 @@ class DLS:
         self.P = np.full((len(self.local), self.num), self.alpha)
 
 
+# DLS+ADMM
+class DLS_ADMM:
+    """
+    dynamic learning of synchronization (DLS) algorithm
+    这个版本解决的问题:
+    1. 解决了并行运行的问题
+    2. 解决了学习参量过多时,内存过大的bug
+    3. 加入了交替方向乘子法, 限定调节范围 (alternating direction method of multipliers (ADMM))
+
+    args:
+        N : 需要学习的参量数
+        local : 需要调整的状态变量的位置
+        alpha : 使用 DLS 的学习率参数
+        rho : ADMM的惩罚参数
+        use_admm : 使用ADMM的开关
+        w_min : 权重的最小值约束
+        w_max : 权重的最大值约束
+    """
+    def __init__(self, N=1, local=[1, 2], alpha=0.1, rho=0.1, use_admm=True, w_min=None, w_max=None):
+        self.num = N  # 需要学习的参量数
+        self.local = local  # 需要调整的状态变量的位置
+        self.alpha = alpha  # 使用 DLS 的学习率参数
+        self.rho = rho  # ADMM的惩罚参数
+        self.w_min = w_min  # 权重的最小值约束
+        self.w_max = w_max  # 权重的最大值约束
+        self.use_admm = use_admm  # 是否使用ADMM
+
+        # 存储每个local元素对应的单位矩阵对角线乘以alpha
+        self.P = np.full((len(local), N), self.alpha)
+
+        # 初始化ADMM的z和mu
+        self.z = np.zeros((len(local), N))
+        self.mu = np.zeros((len(local), N))
+
+    def forward(self, w, input, error):
+        local_input = input[self.local]  # 形状是 (len(self.local), N)
+        local_error = error[self.local]  # 形状是 (len(self.local),)
+
+        # 计算 Prs（仅需要对角线与输入相乘）
+        Prs = self.P * local_input  # 直接逐元素相乘
+
+        # 计算 a 的向量化版本
+        as_ = 1.0 / (1.0 + np.sum(local_input * Prs, axis=1))
+
+        # 更新 Ps，只更新对角线部分
+        P_updates = as_[:, np.newaxis] * (Prs ** 2)
+        self.P -= P_updates
+
+        # 计算RLS部分的权重更新
+        delta_w_rls = (as_ * local_error)[:, np.newaxis] * Prs
+        np.add.at(w, self.local, -delta_w_rls)
+
+        # 进行ADMM更新（如果使用ADMM）
+        if self.use_admm:
+            self.update_admm(w)
+
+    def update_admm(self, w):
+        # 使用向量化操作进行ADMM更新
+
+        # 计算delta_w_admm
+        delta_w_admm = self.rho * (self.z - w[self.local]) + self.mu / self.rho
+
+        # 添加轻微的L2正则化项，防止权重过度调整
+        delta_w_admm += 1e-5 * w[self.local]
+
+        # 更新权重w
+        np.add.at(w, self.local, -delta_w_admm)
+
+        # 更新辅助变量z
+        z_new = w[self.local] + self.mu / self.rho
+
+        # 应用权重约束
+        if self.w_min is not None:
+            z_new = np.maximum(z_new, self.w_min)
+        if self.w_max is not None:
+            z_new = np.minimum(z_new, self.w_max)
+
+        self.z = z_new  # 更新z
+
+        # 更新拉格朗日乘子mu
+        self.mu += self.rho * (w[self.local] - self.z)
+
+    def train(self, re_factor, factor, input_mem, self_y=None, dt=0.01):
+        """
+        用来训练你想要修正的值,使得状态变量同步
+        args:
+            rev_factor : 需要更新的参数：如权重或设定的需要修正的值 (N_状态变量 , self.num)
+            factor : 与rev_factor相乘的量    (N_状态变量 , self.num)
+            input_mem : 时刻 t+1 的状态变量, 在给出其他量后   (N_状态变量 ,)
+            self_y : 自定义输入的值，与这个值同步 (N_状态变量,)
+            dt  :   积分步长
+        """
+        # 外部因素的输入值(self.num, self.Inum)
+        input = factor * dt  # (N_状态变量 , self.num)
+
+        if self_y is not None:
+            yMean = self_y  # 监督学习
+        else:
+            yMean = input_mem[self.local].mean()
+
+        # 最小二乘法差值(self.num,)
+        error_y = input_mem - yMean
+
+        self.forward(re_factor, input, error_y)
+
+    def reset(self):
+        self.P = np.full((len(self.local), self.num), self.alpha)
+        self.z = np.zeros((len(self.local), self.num))
+        self.mu = np.zeros((len(self.local), self.num))
+
+
 # ================================== DLS 旧版 ==================================
 # dynamic learning of synchronization (DLS) algorithm
 class RLS_complex(nn.Module):

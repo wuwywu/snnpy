@@ -308,7 +308,7 @@ def f(x, t, *args):
 
 # MSE相关的矩阵
 @njit
-def jac(x, t, *args):
+def jac(x, t, gamma, *args):
     """
     args:
         x (numpy.ndarray) : 状态变量
@@ -316,7 +316,7 @@ def jac(x, t, *args):
     return:
         res (numpy.ndarray) : MSF的雅可比矩阵
     """
-    gamma = 1  # 耦合强度与 Laplacian 矩阵的特征值的乘积(自行在外部设定)
+    # gamma = 1  # 耦合强度与 Laplacian 矩阵的特征值的乘积(自行在外部设定)
 
     # f 相对于 x 的雅可比行列式。
     Df = np.zeros((x.shape[0], x.shape[0]))

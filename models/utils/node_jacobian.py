@@ -164,6 +164,48 @@ def jac(x, t):
     res[2, 0], res[2, 1], res[2, 2] = x[2], 0, x[0] - gamma
     return res
 
+
+# Huang L, Chen Q, Lai Y-C, et al. Generic behavior of master-stability functions in coupled nonlinear dynamical systems[J]. Physical Review E, 2009, 80(3): 036204.
+# forced Duffing system
+def forced_Duffing(x, t, *args):
+    res = np.zeros_like(x)
+    yita = 1.
+    h = 0.1
+    q = 5.6
+    res[0] = x[1]
+    res[1] = -h * x[1] - np.power(x[0], 3) + q * np.sin(yita * t)
+
+    return res
+
+def jac(x, t):
+    h = 0.1
+    res = np.zeros((x.shape[0], x.shape[0]))
+    res[0, 0], res[0, 1] = 0, 1
+    res[1, 0], res[1, 1] = -3 * x[0] * x[0], -h
+
+    return res
+
+
+# Huang L, Chen Q, Lai Y-C, et al. Generic behavior of master-stability functions in coupled nonlinear dynamical systems[J]. Physical Review E, 2009, 80(3): 036204.
+# forced van der Pol
+def forced_vanderPol(x, t, *args):
+    res = np.zeros_like(x)
+    d = 3.
+    F = 15.
+    yita = 4.065
+    res[0] = x[1]
+    res[1] = -x[0] + d * (1 - np.power(x[0], 2)) * x[1] + F * np.sin(yita * t)
+    return res
+
+def jac(x, t):
+    d = 3.
+    res = np.zeros((x.shape[0], x.shape[0]))
+    res[0, 0], res[0, 1] = 0, 1
+    res[1, 0], res[1, 1] = -1 - 2 * d * x[0] * x[1], d * (1 - np.power(x[0], 2))
+
+    return res
+
+
 # ====================== map models ======================
 def Chialvo(x, t):
     res = np.zeros_like(x)

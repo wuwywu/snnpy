@@ -495,6 +495,102 @@ def LCE_jit(x0, f, jac, n_forward, n_compute, dt, p=None, *args):
     return LCE
 
 
+@njit
+def mLCE_jit_discrete(x0, f, jac, n_forward, n_compute, *args):
+    """
+    Parameters:
+        x0 (numpy.ndarray)：初始条件。
+        f（function）: ẋ = f(x, t) 或 x_(n 1) = f(x_n) 的函数 f。
+        jac（function）: f 相对于 x 的雅可比行列式。
+        n_forward (int): Number of steps before starting the mLCE computation.
+        n_compute (int): Number of steps to compute the mLCE, can be adjusted using keep_evolution.
+        dt（float）: 两个时间步之间的时间间隔。
+        *args :  f 和 jac 需要修改的量
+    """
+    t = 0
+    dt = 1
+    x = np.ascontiguousarray(x0)
+    dim = int(len(x0))
+    # 初始化
+    for _ in range(n_forward):
+        x = f(x, t, *args)
+        t += dt
+
+    # Compute the mLCE
+    mLCE = 0.
+    W = np.random.rand(dim)
+    W = W / np.linalg.norm(W)
+
+    for _ in range(n_compute):
+        # w = system.next_LTM(w)
+        jacobian = jac(x, t, *args)
+        if dim == 1:
+            jacobian = jacobian.reshape(-1, 1)
+        jacobian = np.ascontiguousarray(jacobian)
+        W = np.ascontiguousarray(W)
+        W = jacobian @ W
+
+        # system.forward(1, False)
+        x = f(x, t, *args)
+        t += dt
+
+        mLCE += np.log(np.linalg.norm(W))
+        W = W / np.linalg.norm(W)
+
+    mLCE = mLCE / (n_compute * dt)
+    return mLCE
+
+
+@njit
+def LCE_jit_discrete(x0, f, jac, n_forward, n_compute, p, *args):
+    """
+    Parameters:
+        x0 (numpy.ndarray)：初始条件。
+        f（function）: ẋ = f(x, t) 或 x_(n 1) = f(x_n) 的函数 f。
+        jac（function）: f 相对于 x 的雅可比行列式。
+        n_forward (int): Number of steps before starting the mLCE computation.
+        n_compute (int): Number of steps to compute the mLCE, can be adjusted using keep_evolution.
+        dt（float）: 两个时间步之间的时间间隔。
+        p : 函数f的维度
+        *args :  f 和 jac 需要修改的量
+    """
+
+    t = 0
+    dt = 1
+    x = np.ascontiguousarray(x0)
+    dim = int(len(x0))
+
+    if p is None: p = dim
+    # Forward the system before the computation of LCE
+    for _ in range(n_forward):
+        x = f(x, t, *args)
+        t += dt
+
+    # Computation of LCE
+    W = np.eye(dim)[:, :p]
+    LCE = np.zeros(int(p))
+
+    for _ in range(n_compute):
+        # w = system.next_LTM(w)
+        jacobian = jac(x, t, *args)
+        if dim == 1:
+            jacobian = jacobian.reshape(-1, 1)
+        jacobian = np.ascontiguousarray(jacobian)
+        W = np.ascontiguousarray(W)
+        W = jacobian @ W
+
+        # system.forward(1, False)
+        x = f(x, t, *args)
+        t += dt
+
+        W, R = np.linalg.qr(W)
+        for j in range(p):
+            LCE[j] += np.log(np.abs(R[j, j]))
+
+    LCE = LCE / (n_compute * dt)
+    return LCE
+
+
 if __name__ == "__main__":
     # 连续动力系统的定义，此处为 Lorenz63
     sigma = 10.

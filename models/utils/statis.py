@@ -17,6 +17,7 @@ else:
     np1 = numpy
     np = numpy
 import matplotlib.pyplot as plt
+from numba import njit, prange
 
 
 # 计算同步因子
@@ -395,4 +396,75 @@ class strength_incoherence:
         SI = 1 - sm.mean()
 
         return SI
+
+
+# ======================================== 计算信噪比(周期信号) ========================================
+def cal_SNR(xs, sampling_interval=0.01):
+    """
+    xs : 输入信号 [N, ] 或者 [M, N] --> M个信号序列，每个信号序列有 N 个值
+    sampling_interval : 信号的采样间隔
+    """
+    # 确保输入是二维数组
+    if xs.ndim == 1:
+        xs = xs.reshape(1, -1)
+    M, N = xs.shape
+
+    # 确保输入数据类型为 float64
+    xs = xs.astype(np.float64)
+
+    # 创建一个复数数组用于存储傅里叶变换结果
+    fxs = np.zeros((M, N), dtype=np.complex128)
+
+    # 为每个信号计算傅里叶变换
+    for i in range(M):
+        fxs[i, :] = np.fft.fft(xs[i, :])
+    # fxs = np.apply_along_axis(np.fft.fft, 1, xs)
+
+    # 使用 Numba 加速后续 SNR 计算
+    snrs = _calculate_SNR_from_fft(fxs, N, sampling_interval)
+    return snrs
+
+@njit(parallel=True)
+def _calculate_SNR_from_fft(fxs, N, sampling_interval):
+    M = fxs.shape[0]
+    snrs = np.zeros(M)
+
+    for k in prange(M):
+        fx = fxs[k]
+
+        power = np.abs(fx[:N//2])**2 / ((N//2)**2)
+        maxfreq = 1 / sampling_interval
+        freq = np.arange(1, N//2+1) / (N/2) * maxfreq
+
+        for kk in range(10):
+            index1 = index2 = 0
+            mp = np.max(power)
+            index = np.argmax(power)
+            px = freq[index]
+            p = mp
+
+            # 查找左边界
+            for i in range(index, 0, -1):
+                if power[i] < power[i+1] and power[i] < power[i-1]:
+                    lef = freq[i]
+                    index1 = 1
+                    break
+
+            # 查找右边界
+            for j in range(index, len(power) - 1):
+                if power[j] < power[j+1] and power[j] < power[j-1]:
+                    rig = freq[j]
+                    index2 = 1
+                    break
+
+            # 如果找到左右边界，则停止循环
+            if index1 and index2:
+                break
+            else:
+                power = np.delete(power, index)
+
+        Snr = 2 * p * px / (rig - lef)
+        snrs[k] = Snr
+
+    return snrs
 

@@ -238,6 +238,147 @@ class DLS_ADMM:
         self.mu = np.zeros((len(self.local), self.num))
 
 
+# DLS+ADMM+multiranges
+class DLS_ADMM_multiranges:
+    """
+    dynamic learning of synchronization (DLS) algorithm with multiple range constraints using ADMM
+    通过矩阵运算逐渐将权重逼近到给定的多个范围内，包括多个不连续的范围。
+
+    args:
+        N : 需要学习的权重维度
+        local : 需要调整的状态变量的位置（索引）
+        alpha : 使用 DLS 的学习率参数
+        rho : ADMM 的惩罚参数
+        ranges : 给定的多个范围的集合，[(min1, max1), (min2, max2), ...]
+    """
+
+    def __init__(self, N=1, local=[1, 2], alpha=0.1, rho=0.1, use_admm=True, ranges=None):
+        self.num = N  # 需要调整的权重维度
+        self.local = np.array(local)  # 需要调整的位置（索引）
+        self.alpha = alpha  # 学习率参数
+        self.rho = rho  # ADMM 惩罚参数
+        self.use_admm = use_admm  # 是否使用ADMM
+
+        self.P = np.full((len(self.local), N), self.alpha)  # P 矩阵初始化
+        self.z = np.zeros((len(self.local), N))  # 辅助变量 z 初始化
+        self.mu = np.zeros((len(self.local), N))  # 拉格朗日乘子 mu 初始化
+
+        # 定义范围限制
+        self.ranges = np.array(ranges)
+
+    def forward(self, w, input, error):
+        local_input = input[self.local]  # 形状是 (len(self.local), N)
+        local_error = error[self.local]  # 形状是 (len(self.local),)
+
+        # 计算 Prs（仅需要对角线与输入相乘）
+        Prs = self.P * local_input  # 直接逐元素相乘
+
+        # 计算 a 的向量化版本
+        as_ = 1.0 / (1.0 + np.sum(local_input * Prs, axis=1))
+
+        # 更新 Ps，只更新对角线部分
+        P_updates = as_[:, np.newaxis] * (Prs ** 2)
+        self.P -= P_updates
+
+        # 计算RLS部分的权重更新
+        delta_w_rls = (as_ * local_error)[:, np.newaxis] * Prs
+        np.add.at(w, self.local, -delta_w_rls)
+
+        # 进行ADMM更新（如果使用ADMM）
+        if self.use_admm:
+            self.update_admm(w)
+
+    def update_admm(self, w):
+        # 使用向量化操作进行ADMM更新
+
+        # 计算delta_w_admm
+        delta_w_admm = self.rho * (self.z - w[self.local]) + self.mu / self.rho
+
+        # 添加轻微的L2正则化项，防止权重过度调整
+        delta_w_admm += 1e-5 * w[self.local]
+
+        # 更新权重w
+        np.add.at(w, self.local, -delta_w_admm)
+
+        # 更新辅助变量z
+        z_new = w[self.local] + self.mu / self.rho
+
+        # 对 z_new 的所有元素应用多个范围的约束
+        z_new = self.apply_range_constraints(z_new)
+
+        # 更新 z 和 mu
+        self.z = z_new
+        self.mu += self.rho * (w[self.local] - self.z)
+
+    def apply_range_constraints(self, z_new):
+        """
+        根据多个范围，对 z_new 进行调整，将其约束到最近的范围边界。
+        使用 NumPy 向量化操作进行优化，避免显式的 for 循环。
+        """
+
+        # 提取范围的最小值和最大值
+        w_min = self.ranges[:, 0]  # 形状为 (num_ranges,)
+        w_max = self.ranges[:, 1]  # 形状为 (num_ranges,)
+
+        # 扩展 z_new 以便与所有范围的最小值和最大值进行广播比较
+        z_expanded = z_new[:, :, np.newaxis]  # 形状为 (len(self.local), self.num, 1)
+
+        # 判断哪些值在范围内
+        in_range = np.logical_and(z_expanded >= w_min, z_expanded <= w_max)  # 判断 z_new 是否在范围内
+
+        # 对 z_new 超出所有范围的情况，使用 NumPy 的广播机制
+        out_of_range = ~np.any(in_range, axis=2)  # 只有当值不在任何范围内时，才认为它超出范围
+
+        # 如果 z_new 小于最小值或者大于最大值，调整到最近的边界
+        dist_to_min = np.abs(z_expanded - w_min)
+        dist_to_max = np.abs(z_expanded - w_max)
+
+        # 找到每个点最近的最小值和最大值
+        nearest_min_idx = np.argmin(dist_to_min, axis=2)
+        nearest_max_idx = np.argmin(dist_to_max, axis=2)
+
+        # 选择最近的边界值
+        z_adjusted = np.where(out_of_range,
+                              np.where(dist_to_min[np.arange(z_new.shape[0])[:, None], np.arange(
+                                  z_new.shape[1]), nearest_min_idx] <
+                                       dist_to_max[np.arange(z_new.shape[0])[:, None], np.arange(
+                                           z_new.shape[1]), nearest_max_idx],
+                                       w_min[nearest_min_idx],
+                                       w_max[nearest_max_idx]),
+                              z_new)
+
+        return z_adjusted
+
+    def train(self, re_factor, factor, input_mem, self_y=None, dt=0.01):
+        """
+        用来训练你想要修正的值,使得状态变量同步
+        args:
+            rev_factor : 需要更新的参数：如权重或设定的需要修正的值 (N_状态变量 , self.num)
+            factor : 与rev_factor相乘的量    (N_状态变量 , self.num)
+            input_mem : 时刻 t+1 的状态变量, 在给出其他量后   (N_状态变量 ,)
+            self_y : 自定义输入的值，与这个值同步 (N_状态变量,)
+            dt  :   积分步长
+        """
+        # 外部因素的输入值(self.num, self.Inum)
+        input = factor * dt  # (N_状态变量 , self.num)
+
+        if self_y is not None:
+            yMean = self_y  # 监督学习
+        else:
+            yMean = input_mem[self.local].mean()
+
+        # 最小二乘法差值(self.num,)
+        error_y = input_mem - yMean
+
+        self.forward(re_factor, input, error_y)
+
+    def reset(self):
+        # 重置 P、z 和 mu
+        self.P = np.full((len(self.local), self.num), self.alpha)
+        self.z = np.zeros((len(self.local), self.num))
+        self.mu = np.zeros((len(self.local), self.num))
+
+
 # ================================== DLS 旧版 ==================================
 # dynamic learning of synchronization (DLS) algorithm
 class RLS_complex(nn.Module):

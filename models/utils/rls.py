@@ -190,7 +190,7 @@ class DLS_ADMM:
         delta_w_admm = self.rho * (self.z - w[self.local]) + self.mu / self.rho
 
         # 添加轻微的L2正则化项，防止权重过度调整
-        delta_w_admm += 1e-5 * w[self.local]
+        # delta_w_admm += 1e-5 * w[self.local]
 
         # 更新权重w
         np.add.at(w, self.local, -delta_w_admm)
@@ -295,7 +295,7 @@ class DLS_ADMM_multiranges:
         delta_w_admm = self.rho * (self.z - w[self.local]) + self.mu / self.rho
 
         # 添加轻微的L2正则化项，防止权重过度调整
-        delta_w_admm += 1e-5 * w[self.local]
+        # delta_w_admm += 1e-5 * w[self.local]
 
         # 更新权重w
         np.add.at(w, self.local, -delta_w_admm)

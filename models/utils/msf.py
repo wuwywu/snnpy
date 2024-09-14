@@ -381,6 +381,54 @@ def msf_mLCE_jit(x0, f, jac, n_forward, n_compute, dt, gamma, *args):
 
     return mLCE
 
+# 计算 gamma 为复数时的 MSF
+@njit
+def msf_mLCE_jit_complex(x0, f, jac, n_forward, n_compute, dt, gamma, *args):
+    """
+    Parameters:
+        x0 (numpy.ndarray)：初始条件。
+        f（function）: ẋ = f(x, t) 或 x_(n 1) = f(x_n) 的函数 f。
+        jac（function）: f 相对于 x 的雅可比行列式。
+        n_forward (int): Number of steps before starting the mLCE computation.
+        n_compute (int): Number of steps to compute the mLCE, can be adjusted using keep_evolution.
+        dt（float）: 两个时间步之间的时间间隔。
+        *args :  f 和 jac 需要修改的量
+    """
+    t = 0
+    x = x0
+    dim = len(x0)
+    # 初始化
+    for _ in range(n_forward):
+        x = rk4_step(x, t, dt, f, *args)
+        t += dt
+
+    # Compute the mLCE
+    mLCE = 0.
+    W = np.random.rand(dim) + 1j * np.random.rand(dim)
+    W = W / np.linalg.norm(W)
+
+    for _ in range(n_compute):
+        # w = system.next_LTM(w)
+        jacobian = jac(x, t, gamma, *args)
+        jacobian = jacobian.astype(np.complex128)
+
+        k1 = jacobian @ W
+        k2 = jacobian @ (W + (dt / 2.) * k1)
+        k3 = jacobian @ (W + (dt / 2.) * k2)
+        k4 = jacobian @ (W + dt * k3)
+        W = W + (dt / 6.) * (k1 + 2 * k2 + 2 * k3 + k4)
+
+        # system.forward(1, False)
+        x = rk4_step(x, t, dt, f, *args)
+        t += dt
+
+        mLCE += np.log(np.linalg.norm(W))
+        W = W / np.linalg.norm(W)
+
+    mLCE = mLCE / (n_compute * dt)
+
+    return mLCE
+
 @njit
 def msf_LCE_jit(x0, f, jac, n_forward, n_compute, dt, gamma, p=None, *args):
     """

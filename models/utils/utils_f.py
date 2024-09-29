@@ -13,6 +13,7 @@ else:
     np1 = numpy
     np = numpy
 import matplotlib.pyplot as plt
+from numba import njit, prange
 
 # noise产生器
 class noise_types:
@@ -79,54 +80,6 @@ class delayer:
     def reset(self, Tn=None):
         if Tn is not None:
             self.__init__(self.n, Tn)
-
-
-# ISI(interspike interval)
-class ISIer:
-    def __init__(self, th_up=0, th_down=0, max=-70):
-        ''' 
-        HH可以设置为
-        th_up=0, th_down=0, max=-70.0
-        ''' 
-        self.reset_init(th_up=th_up, th_down=th_down, max=max)
-        self.pltx = []
-        self.plty = [] 
-
-    def reset_init(self, th_up, th_down, max):
-        self.th_up = th_up          # 阈上值
-        self.th_down = th_down      # 阈下值
-        self.max_init = max         # 初始最大值
-        self.max = max              # 初始变化最大值
-        self.flag = 0               # 放电标志
-        self.nn = 0                 # 峰的个数
-        self.T_pre = 0              # 前峰时间
-        self.T_post = 0             # 后峰时间
-
-    def __call__(self, x, t, y):
-        # 进入之前请初始化数据
-        # x:测量ISI的值，y:变化的值，t:理论运行时间
-        if x>self.th_up and self.flag==0:
-            self.flag = 1
-        if self.flag==1 and x>self.max:
-            self.max = x
-            self.T_post = t
-        if x<self.th_down and self.flag==1:
-            self.flag = 0
-            self.nn += 1
-            if self.nn>2:
-                ISI = self.T_post-self.T_pre
-                self.pltx.append(y)
-                self.plty.append(ISI)
-            self.T_pre = self.T_post
-            self.max = self.max_init        # 初始化
-
-    def plt_ISI(self, markersize=.8, color="k"):
-        plt.plot(self.pltx, self.plty, "o", 
-                 markersize=markersize, color=color)
-        
-    def reset(self):
-        self.reset_init(th_up=self.th_up, th_down=self.th_down 
-                        ,max=self.max_init)
 
 
 class spikevent:

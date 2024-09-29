@@ -2,6 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
+      <module fileurl="file://$PROJECT_DIR$/../../github/dynamic_systems/.idea/dynamic_systems.iml" filepath="$PROJECT_DIR$/../../github/dynamic_systems/.idea/dynamic_systems.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/snnpy.iml" filepath="$PROJECT_DIR$/.idea/snnpy.iml" />
     </modules>
   </component>

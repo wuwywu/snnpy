@@ -305,6 +305,7 @@ if __name__ == "__main__":
 
 
     LCE_values = parallel_msf_mLCE(gamma_list, x0, f, jac, T_init, T_cal, dt, sigma, rho, beta)
+
     # Plot of LCE
     plt.figure(figsize=(6, 4))
     plt.plot(gamma_list, LCE_values)

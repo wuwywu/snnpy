@@ -260,7 +260,7 @@ if __name__ == "__main__":
         return res
 
 
-    sigma_list = np.arange(0, 10, .01)
+    sigma_list = np.arange(0, 1, .01)
     @njit(parallel=True)
     def parallel_mLCE(sigma_list, x0, f, jac, T_init, T_cal, dt, *args):
         n = len(sigma_list)
@@ -293,7 +293,7 @@ if __name__ == "__main__":
 
     mLCE_values = parallel_mLCE(sigma_list, x0, f, jac, T_init, T_cal, dt, rho, beta)
     # LCE_values = parallel_LCE(sigma_list, x0, f, jac, T_init, T_cal, dt, rho, beta)
-    #
+
     # Plot of LCE
     plt.figure(figsize=(6, 4))
     plt.plot(sigma_list, mLCE_values)

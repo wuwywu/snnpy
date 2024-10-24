@@ -12,8 +12,7 @@ from abc import ABC, abstractmethod
 import matplotlib.pyplot as plt
 from numba import njit, prange
 import os
-os.environ["OMP_NUM_THREADS"] = "4"  # 将4替换为你希望使用的线程数
-os.environ["OPENBLAS_NUM_THREADS"] = "4"
+os.environ['NUMBA_NUM_THREADS'] = '4'
 
 # ==================================== 用于 numba 并行运算的函数代码 ====================================
 # ẋ = f(x, t) 或 x_(n 1) = f(x_n) 的函数 f。

@@ -402,7 +402,7 @@ if __name__ == "__main__":
 
     Lorenz63 = ContinuousDS(x0, f, jac, dt)
 
-    计算LCE
+    # 计算LCE
     LCE, history = LCE(Lorenz63, T_init, T_cal, keep=True)
     # LCE = mLCE(Lorenz63, T_init, T_cal, keep=False)
     print(LCE)

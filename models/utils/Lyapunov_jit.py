@@ -14,8 +14,8 @@ from abc import ABC, abstractmethod
 import matplotlib.pyplot as plt
 from numba import njit, prange
 import os
-os.environ["OMP_NUM_THREADS"] = "4"  # 将4替换为你希望使用的线程数
-os.environ["OPENBLAS_NUM_THREADS"] = "4"
+os.environ['NUMBA_NUM_THREADS'] = '4'
+
 
 # ==================================== 用于 numba 并行运算的函数代码 ====================================
 # 注意：
@@ -291,12 +291,12 @@ if __name__ == "__main__":
     # LCE = LCE_jit(x0, f, jac, T_init, T_cal, dt, None, sigma, rho, beta)
     # print(LCE)
 
-    # mLCE_values = parallel_mLCE(sigma_list, x0, f, jac, T_init, T_cal, dt, rho, beta)
-    LCE_values = parallel_LCE(sigma_list, x0, f, jac, T_init, T_cal, dt, rho, beta)
+    mLCE_values = parallel_mLCE(sigma_list, x0, f, jac, T_init, T_cal, dt, rho, beta)
+    # LCE_values = parallel_LCE(sigma_list, x0, f, jac, T_init, T_cal, dt, rho, beta)
     #
     # Plot of LCE
     plt.figure(figsize=(6, 4))
-    plt.plot(sigma_list, LCE_values)
+    plt.plot(sigma_list, mLCE_values)
     plt.ylabel("LCE")
     plt.xlabel("$\sigma$")
     plt.show()

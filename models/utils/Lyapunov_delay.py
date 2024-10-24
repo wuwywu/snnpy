@@ -240,12 +240,13 @@ def LCE(system, n_forward : int, n_compute : int, jit=True):
             system.delta_x, norms = gram_schmidt(system.delta_x)
         ltot += np.log(np.maximum(norms, 1e-10))  # 避免对非正数取对数
 
-        LEs = ltot / ((i+1)*_dt)
+        # LEs = ltot / ((i+1)*_dt)
 
         # if i % (n_compute // 10) == 0 and i != 0:  # 定期打印信息
         #     # print(f"Step {i}: Lyapunov Exponents = {LEs}")
         #     print(f"Step {i}: Max Lyapunov Exponent = {np.max(LEs)}")
         #     # print(LEs)
+    LEs = ltot / (n_compute * _dt)
     mle = np.max(LEs)
 
     return mle

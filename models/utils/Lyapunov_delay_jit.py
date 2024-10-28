@@ -45,57 +45,69 @@ def jac_delay(x, x_tau, t, *args):
 @njit
 def compute_mle_jit(x0, f_delay, jac_delay, dt, tau, n_forward, n_compute, *args):
     t = 0
-    dt = dt    
 
     x = x0.copy()
 
-    dim = len(x0)      # 变量维度
-    N = int(tau/dt + 1)   # 拓展维度
+    dim = len(x0)         # 变量维度
+    N = int(tau / dt + 1) # 拓展维度（历史缓冲区大小）
 
+    # 初始化历史缓冲区
     x_hist = np.broadcast_to(x[:, np.newaxis], (dim, N)).copy()
-    x_new = np.zeros_like(x)
+    delta_hist = np.zeros((dim, N))  # 微扰历史缓冲区
 
-    # 初始化延迟区间内的微扰函数
-    delta_hist = np.zeros((dim, N))
-    # 在延迟区间内随机初始化微扰
+    # 初始化插入位置索引
+    current_index = 0
+
+    # 在延迟区间内随机初始化微扰，并归一化
     for i in range(dim):
         delta_hist[i, :] = np.random.randn(N)
-
-    # 归一化微扰函数
-    delta_norm = np.linalg.norm(delta_hist)
-    delta_hist /= delta_norm
+    delta_hist /= np.linalg.norm(delta_hist)
 
     ltot = 0.0  # 累积的李雅普诺夫指数
 
+    # 预积分阶段，用于稳定系统
     for _ in range(n_forward):
-        # 预积分，稳定系统
-        x_new[:] = rk4_step(x_hist[:, 0], x_hist[:, -1], dt, t, f_delay, *args)
-        x_hist[:, 1:] = x_hist[:, :-1]
-        x_hist[:, 0] = x_new[:]
+        # 获取延迟位置索引
+        delayed_index = (current_index - int(tau / dt)) % N
+
+        # 计算当前值和延迟值的雅可比矩阵
+        x_new = rk4_step(x_hist[:, current_index], x_hist[:, delayed_index], dt, t, f_delay, *args)
+
+        # 更新 current_index，插入 x_new
+        current_index = (current_index + 1) % N
+        x_hist[:, current_index] = x_new
         t += dt
 
+    # 主循环，计算 MLE
     for _ in range(n_compute):
-        # 主循环，计算 MLE
-        x_new[:] = rk4_step(x_hist[:, 0], x_hist[:, -1], dt, t, f_delay, *args)
-        x_hist[:, 1:] = x_hist[:, :-1]
-        x_hist[:, 0] = x_new[:]
+        # 计算延迟位置索引
+        delayed_index = (current_index - int(tau / dt)) % N
 
-        # 演化微扰向量
-        df_dx, df_dx_tau = jac_delay(x_hist[:, 0], x_hist[:, -1], t, *args)
+        # 计算雅可比矩阵，传入未更新的 current_index 和 delayed_index 数据
+        df_dx, df_dx_tau = jac_delay(x_hist[:, current_index], x_hist[:, delayed_index], t, *args)
+        
+        # 获取当前和延迟的微扰向量
+        delta_t = np.ascontiguousarray(delta_hist[:, current_index])
+        delta_tau = np.ascontiguousarray(delta_hist[:, delayed_index])
+        delta_new = rk4_step_delta(delta_t, delta_tau, dt, df_dx, df_dx_tau)
 
-        delta_t, delta_tau = np.ascontiguousarray(delta_hist[:, 0]), np.ascontiguousarray(delta_hist[:, -1])
-        delta_new = rk4_step_delta(delta_t, delta_tau, dt, df_dx, df_dx_tau)    # 延迟系统的雅可比矩阵作用在微扰向量上
+        # 更新 delta_hist 缓冲区，插入新微扰
+        delta_current_index = (current_index + 1) % N
+        delta_hist[:, delta_current_index] = delta_new
 
-        # 更新微扰历史
-        delta_hist[:, 1:] = delta_hist[:, :-1]
-        delta_hist[:, 0] = delta_new[:]
-
-        # 对整个延迟区间的微扰函数进行归一化
+        # 对微扰历史进行归一化
         delta_norm = np.linalg.norm(delta_hist)
         delta_hist /= delta_norm
 
         # 累积范数增长的对数
         ltot += np.log(np.maximum(delta_norm, 1e-10))
+
+        # 计算新的 x 值，使用 f_delay 更新 x_hist
+        x_new = rk4_step(x_hist[:, current_index], x_hist[:, delayed_index], dt, t, f_delay, *args)
+        
+        # 更新 x_hist 缓冲区，插入新 x 值
+        current_index = (current_index + 1) % N
+        x_hist[:, current_index] = x_new
 
         t += dt
 
@@ -112,52 +124,65 @@ def compute_mle_discrete(x0, f_delay, jac_delay, tau, n_forward, n_compute, *arg
     x = x0.copy()
 
     dim = len(x0)      # 变量维度
-    N = int(tau + 1)   # 拓展维度
+    N = int(tau + 1)   # 拓展维度（历史缓冲区大小）
 
+    # 初始化历史缓冲区
     x_hist = np.broadcast_to(x[:, np.newaxis], (dim, N)).copy()
-    x_new = np.zeros_like(x)
+    delta_hist = np.zeros((dim, N))  # 微扰历史
 
-    # 初始化延迟区间内的微扰函数
-    delta_hist = np.zeros((dim, N))
-    # 在延迟区间内随机初始化微扰
+    # 初始化插入位置索引
+    current_index = 0
+
+    # 随机初始化微扰并归一化
     for i in range(dim):
         delta_hist[i, :] = np.random.randn(N)
-
-    # 归一化微扰函数
-    delta_norm = np.linalg.norm(delta_hist)
-    delta_hist /= delta_norm
+    delta_hist /= np.linalg.norm(delta_hist)
 
     ltot = 0.0  # 累积的李雅普诺夫指数
 
+    # 预积分阶段，用于稳定系统
     for _ in range(n_forward):
-        # 预积分，稳定系统
-        x_new[:] = f_delay(x_hist[:, 0], x_hist[:, -1], t, *args)
-        x_hist[:, 1:] = x_hist[:, :-1]
-        x_hist[:, 0] = x_new[:]
+        # 计算延迟位置索引
+        delayed_index = (current_index - int(tau)) % N
+
+        # 调用 f_delay 计算 x_new，但不立即更新 x_hist
+        x_new = f_delay(x_hist[:, current_index], x_hist[:, delayed_index], t, *args)
+        
+        # 更新 current_index 后再写入 x_new
+        current_index = (current_index + 1) % N
+        x_hist[:, current_index] = x_new
         t += dt
 
+    # 主循环，计算 MLE
     for _ in range(n_compute):
-        # 主循环，计算 MLE
-        x_new[:] = f_delay(x_hist[:, 0], x_hist[:, -1], t, *args)
-        x_hist[:, 1:] = x_hist[:, :-1]
-        x_hist[:, 0] = x_new[:]
+        # 计算延迟位置索引
+        delayed_index = (current_index - int(tau)) % N
 
-        # 演化微扰向量
-        df_dx, df_dx_tau = jac_delay(x_hist[:, 0], x_hist[:, -1], t, *args)
+        # 先计算雅可比矩阵，确保传递的是未更新的 current_index 和 delayed_index 数据
+        df_dx, df_dx_tau = jac_delay(x_hist[:, current_index], x_hist[:, delayed_index], t, *args)
+        
+        # 获取当前和延迟的微扰向量
+        delta_t = np.ascontiguousarray(delta_hist[:, current_index])
+        delta_tau = np.ascontiguousarray(delta_hist[:, delayed_index])
+        delta_new = df_dx @ delta_t + df_dx_tau @ delta_tau
 
-        delta_t, delta_tau = np.ascontiguousarray(delta_hist[:, 0]), np.ascontiguousarray(delta_hist[:, -1])
-        delta_new = df_dx @ delta_t + df_dx_tau @ delta_tau  # 延迟系统的雅可比矩阵作用在微扰向量上
+        # 将 delta_new 插入 delta_hist
+        delta_current_index = (current_index + 1) % N
+        delta_hist[:, delta_current_index] = delta_new
 
-        # 更新微扰历史
-        delta_hist[:, 1:] = delta_hist[:, :-1]
-        delta_hist[:, 0] = delta_new[:]
-
-        # 对整个延迟区间的微扰函数进行归一化
+        # 对微扰历史进行归一化
         delta_norm = np.linalg.norm(delta_hist)
         delta_hist /= delta_norm
 
         # 累积范数增长的对数
         ltot += np.log(np.maximum(delta_norm, 1e-10))
+
+        # 计算 f_delay 以获得新的 x 值
+        x_new = f_delay(x_hist[:, current_index], x_hist[:, delayed_index], t, *args)
+
+        # 更新 x_hist
+        current_index = (current_index + 1) % N
+        x_hist[:, current_index] = x_new
 
         t += dt
 
@@ -379,7 +404,7 @@ if __name__ == "__main__":
     dt = 0.01
     
     mle = compute_mle_jit(x0, f, jac, dt, tau, T_init, T_cal)
-    print(mle)  # 0.009466645742446282
+    print(mle)  # 0.00946463480301904
     
     @njit
     def f_Ikeda1(x, x_tau, t):
@@ -420,7 +445,7 @@ if __name__ == "__main__":
     dt = 0.01
     
     mle = compute_mle_jit(x0, f, jac, dt, tau, T_init, T_cal)
-    print(mle)  # 0.2062858963274173
+    print(mle)  # 0.206293604132223
 
     tau = 2*np.pi
    
@@ -449,5 +474,5 @@ if __name__ == "__main__":
     dt = 0.01
     
     mle = compute_mle_jit(x0, f, jac, dt, tau, T_init, T_cal)
-    print(mle)  # 0.107190114786984
+    print(mle)  # 0.10722666519935511
     

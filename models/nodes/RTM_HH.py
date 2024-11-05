@@ -58,7 +58,7 @@ class RTM_HH(Neurons):
         alpha_n = 0.032 * (52 + self.mem) / (1 - np.exp(-(52 + self.mem) / 5))
         beta_n = 0.5 * np.exp(-(self.mem + 57) / 40)
         alpha_h = 0.128 * np.exp(-(self.mem + 50) / 18)
-        beta_h = 4/(np.exp(-(27 + self.mem)/10) + 1)
+        beta_h = 4/(np.exp(-(27 + self.mem)/5) + 1)
 
         alpha_m = 0.32 * (self.mem + 54) / (1 - np.exp(-(54 + self.mem) / 4))
         beta_m = 0.28 * (self.mem + 27) / (np.exp((self.mem + 27) / 5) - 1)

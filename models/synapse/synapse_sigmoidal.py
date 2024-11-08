@@ -15,7 +15,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from base_Mod import Synapse
 
-
 class syn_sigmoidal(Synapse):
     """
     pre: 突触前神经元
@@ -124,7 +123,7 @@ class syn_sigmoidal_delay(Synapse):
         if post_mem is None: post_mem = self.post.mem
         pre_mem = self.delayer(self.pre.mem)  # 存储延迟，并给出延迟的值
         vj_vi = pre_mem - np.expand_dims(post_mem, axis=1)  # pre减post
-        Isyn = (self.g * self.conn * vj_vi).sum(axis=1)  # 0维度--post，1维度--pre
+        Isyn = (self.w * self.conn * vj_vi).sum(axis=1)  # 0维度--post，1维度--pre
         return Isyn
 
     def syn_chem_sigmoidal(self, pre_mem=None, post_mem=None):

@@ -90,7 +90,7 @@ class syn_chem:
 
         s = 0
         t = 0
-        ds_dt = np.exp(-t / tau_d_q) * (1.0 - s) / tau_r - s * tau_d
+        ds_dt = np.exp(-t / tau_d_q) * (1.0 - s) / tau_r - s / tau_d
         while ds_dt > 0:
             t_old = t
             ds_dt_old = ds_dt
